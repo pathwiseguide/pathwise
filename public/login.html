@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathwise - Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-container">
+            <div class="login-box">
+                <div class="logo">
+                    <h1>Pathwise</h1>
+                    <p class="tagline">Your journey, your path</p>
+                </div>
+                
+                <div id="loginForm" class="auth-form">
+                    <h2>Welcome Back</h2>
+                    <p class="subtitle">Sign in to continue</p>
+                    
+                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+                    
+                    <form id="loginFormElement">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input 
+                                type="text" 
+                                id="username" 
+                                name="username" 
+                                required 
+                                autocomplete="username"
+                                placeholder="Enter your username"
+                            >
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                required 
+                                autocomplete="current-password"
+                                placeholder="Enter your password"
+                            >
+                        </div>
+                        
+                        <button type="submit" class="btn-primary btn-full">Sign In</button>
+                    </form>
+                    
+                    <div class="auth-footer">
+                        <p>Don't have an account? <a href="#" id="showRegister">Sign up</a></p>
+                    </div>
+                </div>
+                
+                <div id="registerForm" class="auth-form" style="display: none;">
+                    <h2>Create Account</h2>
+                    <p class="subtitle">Join Pathwise today</p>
+                    
+                    <div id="registerErrorMessage" class="error-message" style="display: none;"></div>
+                    <div id="registerSuccessMessage" class="success-message" style="display: none;"></div>
+                    
+                    <form id="registerFormElement">
+                        <div class="form-group">
+                            <label for="regUsername">Username</label>
+                            <input 
+                                type="text" 
+                                id="regUsername" 
+                                name="username" 
+                                required 
+                                autocomplete="username"
+                                placeholder="Choose a username"
+                                minlength="3"
+                            >
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="regPassword">Password</label>
+                            <input 
+                                type="password" 
+                                id="regPassword" 
+                                name="password" 
+                                required 
+                                autocomplete="new-password"
+                                placeholder="Create a password"
+                                minlength="6"
+                            >
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="regEmail">Email (optional)</label>
+                            <input 
+                                type="email" 
+                                id="regEmail" 
+                                name="email" 
+                                autocomplete="email"
+                                placeholder="your.email@example.com"
+                            >
+                        </div>
+                        
+                        <button type="submit" class="btn-primary btn-full">Create Account</button>
+                    </form>
+                    
+                    <div class="auth-footer">
+                        <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+</html>
+

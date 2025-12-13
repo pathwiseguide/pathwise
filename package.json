@@ -7,13 +7,17 @@
     "start": "node server.js",
     "dev": "node server.js"
   },
-  "keywords": ["questionnaire", "survey", "data-collection"],
+  "keywords": [
+    "questionnaire",
+    "survey",
+    "data-collection"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
-    "body-parser": "^1.20.2"
+    "express": "^4.18.2",
+    "express-session": "^1.18.2"
   }
 }
-

@@ -12,16 +12,59 @@ const questionnaireContainer = document.getElementById('questionnaire');
 const loadingDiv = document.getElementById('loading');
 const thankYouDiv = document.getElementById('thank-you');
 const newResponseBtn = document.getElementById('newResponseBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const userInfo = document.getElementById('userInfo');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    loadQuestions();
+    checkAuthentication();
     setupEventListeners();
 });
+
+// Check if user is authenticated
+async function checkAuthentication() {
+    try {
+        const response = await fetch('/api/auth/check', {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.authenticated) {
+            // User is logged in
+            userInfo.textContent = `Welcome, ${data.user.username}`;
+            loadQuestions();
+        } else {
+            // Redirect to login
+            window.location.href = '/login.html';
+        }
+    } catch (error) {
+        console.error('Auth check error:', error);
+        window.location.href = '/login.html';
+    }
+}
 
 // Event Listeners
 function setupEventListeners() {
     newResponseBtn.addEventListener('click', startNewResponse);
+    logoutBtn.addEventListener('click', handleLogout);
+}
+
+// Handle logout
+async function handleLogout() {
+    try {
+        const response = await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            window.location.href = '/login.html';
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        // Redirect anyway
+        window.location.href = '/login.html';
+    }
 }
 
 // Load questions from API
@@ -34,12 +77,17 @@ async function loadQuestions() {
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
         
         const response = await fetch(`${API_BASE}/questions`, {
-            signal: controller.signal
+            signal: controller.signal,
+            credentials: 'include' // Include session cookie
         });
         
         clearTimeout(timeoutId);
         
         if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
@@ -80,12 +128,65 @@ async function loadQuestions() {
         
         renderQuestionnaire();
     } catch (error) {
+        // If it's a 401, redirect to login
+        if (error.message && error.message.includes('401')) {
+            window.location.href = '/login.html';
+            return;
+        }
         console.error('Error loading questions:', error);
         if (error.name === 'AbortError') {
             loadingDiv.innerHTML = 'Request timed out. The server may be starting up (Render free tier takes ~30 seconds).<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>';
         } else {
             loadingDiv.innerHTML = `Error loading questions: ${error.message}<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>`;
         }
+    }
+}
+
+// Save questions to server
+async function saveQuestionsToServer(questionsToSave) {
+    const response = await fetch(`${API_BASE}/questions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(questionsToSave)
+    });
+    
+    if (!response.ok) {
+        if (response.status === 401) {
+            window.location.href = '/login.html';
+            return;
+        }
+        throw new Error('Failed to save questions');
+    }
+    } catch (error) {
+        console.error('Error loading questions:', error);
+        if (error.name === 'AbortError') {
+            loadingDiv.innerHTML = 'Request timed out. The server may be starting up (Render free tier takes ~30 seconds).<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>';
+        } else {
+            loadingDiv.innerHTML = `Error loading questions: ${error.message}<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>`;
+        }
+    }
+}
+
+// Save questions to server
+async function saveQuestionsToServer(questionsToSave) {
+    const response = await fetch(`${API_BASE}/questions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(questionsToSave)
+    });
+    
+    if (!response.ok) {
+        if (response.status === 401) {
+            window.location.href = '/login.html';
+            return;
+        }
+        throw new Error('Failed to save questions');
     }
 }
 
@@ -420,6 +521,7 @@ async function submitResponse() {
             headers: {
                 'Content-Type': 'application/json'
             },
+            credentials: 'include', // Include session cookie
             body: JSON.stringify(responseData)
         });
         

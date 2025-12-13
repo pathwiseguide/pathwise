@@ -1,14 +1,31 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const session = require('express-session');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'pathwise-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true // Allow cookies
+}));
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
@@ -16,6 +33,7 @@ app.use(express.static('public'));
 const DATA_DIR = path.join(__dirname, 'data');
 const QUESTIONS_FILE = path.join(DATA_DIR, 'questions.json');
 const RESPONSES_FILE = path.join(DATA_DIR, 'responses.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -32,6 +50,11 @@ if (!fs.existsSync(RESPONSES_FILE)) {
   fs.writeFileSync(RESPONSES_FILE, JSON.stringify([], null, 2));
 }
 
+// Initialize users file if it doesn't exist
+if (!fs.existsSync(USERS_FILE)) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2));
+}
+
 // Helper function to read JSON file
 function readJSONFile(filePath) {
   try {
@@ -45,6 +68,37 @@ function readJSONFile(filePath) {
 // Helper function to write JSON file
 function writeJSONFile(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+// Password hashing
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+// User authentication middleware
+function requireLogin(req, res, next) {
+  if (req.session && req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ 
+      success: false,
+      message: 'Please log in to access this resource' 
+    });
+  }
+}
+
+// Check if user is logged in (for frontend)
+function checkAuth(req, res, next) {
+  if (req.session && req.session.userId) {
+    next();
+  } else {
+    // Redirect to login for browser requests, return JSON for API requests
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      res.status(401).json({ authenticated: false });
+    } else {
+      res.redirect('/login.html');
+    }
+  }
 }
 
 // Authentication middleware for admin endpoints
@@ -71,8 +125,138 @@ function requireAuth(req, res, next) {
 
 // API Routes
 
-// Get all questions
-app.get('/api/questions', (req, res) => {
+// Authentication Routes
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { username, password, email } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username and password are required' 
+      });
+    }
+    
+    if (username.length < 3) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username must be at least 3 characters' 
+      });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Password must be at least 6 characters' 
+      });
+    }
+    
+    const users = readJSONFile(USERS_FILE);
+    
+    // Check if username already exists
+    if (users.find(u => u.username === username)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username already exists' 
+      });
+    }
+    
+    // Create new user
+    const newUser = {
+      id: Date.now().toString(),
+      username: username,
+      passwordHash: hashPassword(password),
+      email: email || '',
+      createdAt: new Date().toISOString()
+    };
+    
+    users.push(newUser);
+    writeJSONFile(USERS_FILE, users);
+    
+    // Auto-login after registration
+    req.session.userId = newUser.id;
+    req.session.username = newUser.username;
+    
+    console.log(`New user registered: ${username}`);
+    res.json({ 
+      success: true, 
+      message: 'Account created successfully',
+      user: { id: newUser.id, username: newUser.username }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Registration failed' 
+    });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username and password are required' 
+      });
+    }
+    
+    const users = readJSONFile(USERS_FILE);
+    const user = users.find(u => u.username === username);
+    
+    if (!user || user.passwordHash !== hashPassword(password)) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid username or password' 
+      });
+    }
+    
+    // Create session
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    
+    console.log(`User logged in: ${username}`);
+    res.json({ 
+      success: true, 
+      message: 'Login successful',
+      user: { id: user.id, username: user.username }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Login failed' 
+    });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Logout failed' });
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
+});
+
+app.get('/api/auth/check', (req, res) => {
+  if (req.session && req.session.userId) {
+    res.json({ 
+      authenticated: true, 
+      user: { 
+        id: req.session.userId, 
+        username: req.session.username 
+      } 
+    });
+  } else {
+    res.json({ authenticated: false });
+  }
+});
+
+// Get all questions (requires login)
+app.get('/api/questions', requireLogin, (req, res) => {
   try {
     const questions = readJSONFile(QUESTIONS_FILE);
     console.log(`GET /api/questions - Returning ${questions.length} questions`);
@@ -83,8 +267,8 @@ app.get('/api/questions', (req, res) => {
   }
 });
 
-// Update questions (for admin/configuration)
-app.post('/api/questions', (req, res) => {
+// Update questions (for admin/configuration - requires login)
+app.post('/api/questions', requireLogin, (req, res) => {
   const questions = req.body;
   if (Array.isArray(questions)) {
     writeJSONFile(QUESTIONS_FILE, questions);
@@ -94,18 +278,21 @@ app.post('/api/questions', (req, res) => {
   }
 });
 
-// Submit responses
-app.post('/api/responses', (req, res) => {
+// Submit responses (requires login)
+app.post('/api/responses', requireLogin, (req, res) => {
   const response = req.body;
   const responses = readJSONFile(RESPONSES_FILE);
   
-  // Add timestamp
+  // Add user info and timestamp
+  response.userId = req.session.userId;
+  response.username = req.session.username;
   response.timestamp = new Date().toISOString();
   response.id = Date.now().toString();
   
   responses.push(response);
   writeJSONFile(RESPONSES_FILE, responses);
   
+  console.log(`Response submitted by user: ${req.session.username}`);
   res.json({ success: true, message: 'Response saved successfully', id: response.id });
 });
 
@@ -144,8 +331,13 @@ app.get('/api/export', requireAuth, (req, res) => {
   }
 });
 
-// Serve the main page
-app.get('/', (req, res) => {
+// Serve login page
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Serve the main page (check authentication)
+app.get('/', checkAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
