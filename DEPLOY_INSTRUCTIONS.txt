@@ -1,0 +1,49 @@
+STEP-BY-STEP DEPLOYMENT INSTRUCTIONS
+=====================================
+
+After installing Git and creating a GitHub repository, run these commands:
+
+1. Navigate to your project:
+   cd C:\Users\jiayu\questionnaire-app
+
+2. Initialize Git (if not already done):
+   git init
+
+3. Add all files:
+   git add .
+
+4. Make your first commit:
+   git commit -m "Initial commit - Pathwise app"
+
+5. Rename branch to main:
+   git branch -M main
+
+6. Add your GitHub repository (replace YOUR_USERNAME):
+   git remote add origin https://github.com/YOUR_USERNAME/pathwise.git
+
+7. Push your code:
+   git push -u origin main
+
+   (You'll be prompted for your GitHub username and password/token)
+
+8. Go to https://render.com and sign up
+
+9. Click "New +" → "Web Service"
+
+10. Connect your GitHub account
+
+11. Select your "pathwise" repository
+
+12. Configure:
+    - Name: pathwise (or any name)
+    - Environment: Node
+    - Build Command: npm install
+    - Start Command: npm start
+
+13. Click "Create Web Service"
+
+14. Wait 2-3 minutes for deployment
+
+15. Your site will be live at: https://pathwise.onrender.com (or similar URL)
+
+

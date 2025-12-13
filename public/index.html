@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathwise</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pathwise</h1>
+        </header>
+
+        <div id="questionnaire-container" class="questionnaire-container">
+            <div id="loading" class="loading">Loading questions...</div>
+            <div id="questionnaire" class="questionnaire" style="display: none;">
+                <!-- Questions will be dynamically inserted here -->
+            </div>
+            <div id="thank-you" class="thank-you" style="display: none;">
+                <h2>Thank You!</h2>
+                <p>Your responses have been saved successfully.</p>
+                <button id="newResponseBtn" class="btn-primary">Submit Another Response</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
