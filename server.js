@@ -47,6 +47,28 @@ function writeJSONFile(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
+// Authentication middleware for admin endpoints
+function requireAuth(req, res, next) {
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'; // Default password, change via environment variable
+  const providedPassword = req.query.password || req.headers['x-admin-password'];
+  
+  if (!providedPassword) {
+    return res.status(401).json({ 
+      error: 'Unauthorized', 
+      message: 'Password required. Add ?password=YOUR_PASSWORD to the URL or set X-Admin-Password header.' 
+    });
+  }
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(403).json({ 
+      error: 'Forbidden', 
+      message: 'Invalid password.' 
+    });
+  }
+  
+  next();
+}
+
 // API Routes
 
 // Get all questions
@@ -87,27 +109,39 @@ app.post('/api/responses', (req, res) => {
   res.json({ success: true, message: 'Response saved successfully', id: response.id });
 });
 
-// Get all responses
-app.get('/api/responses', (req, res) => {
-  const responses = readJSONFile(RESPONSES_FILE);
-  res.json(responses);
+// Get all responses (protected - requires password)
+app.get('/api/responses', requireAuth, (req, res) => {
+  try {
+    const responses = readJSONFile(RESPONSES_FILE);
+    console.log(`GET /api/responses - Returning ${responses.length} responses (authenticated)`);
+    res.json(responses);
+  } catch (error) {
+    console.error('Error getting responses:', error);
+    res.status(500).json({ error: 'Failed to load responses' });
+  }
 });
 
-// Export data (questions and responses)
-app.get('/api/export', (req, res) => {
-  const questions = readJSONFile(QUESTIONS_FILE);
-  const responses = readJSONFile(RESPONSES_FILE);
-  
-  const exportData = {
-    exportDate: new Date().toISOString(),
-    questions: questions,
-    responses: responses,
-    totalResponses: responses.length
-  };
-  
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', 'attachment; filename=questionnaire-export.json');
-  res.json(exportData);
+// Export data (questions and responses) (protected - requires password)
+app.get('/api/export', requireAuth, (req, res) => {
+  try {
+    const questions = readJSONFile(QUESTIONS_FILE);
+    const responses = readJSONFile(RESPONSES_FILE);
+    
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      questions: questions,
+      responses: responses,
+      totalResponses: responses.length
+    };
+    
+    console.log(`GET /api/export - Exporting ${responses.length} responses (authenticated)`);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=questionnaire-export.json');
+    res.json(exportData);
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    res.status(500).json({ error: 'Failed to export data' });
+  }
 });
 
 // Serve the main page
