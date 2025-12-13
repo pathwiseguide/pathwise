@@ -51,8 +51,14 @@ function writeJSONFile(filePath, data) {
 
 // Get all questions
 app.get('/api/questions', (req, res) => {
-  const questions = readJSONFile(QUESTIONS_FILE);
-  res.json(questions);
+  try {
+    const questions = readJSONFile(QUESTIONS_FILE);
+    console.log(`GET /api/questions - Returning ${questions.length} questions`);
+    res.json(questions);
+  } catch (error) {
+    console.error('Error getting questions:', error);
+    res.status(500).json({ error: 'Failed to load questions' });
+  }
 });
 
 // Update questions (for admin/configuration)
@@ -109,8 +115,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log(`Data stored in: ${DATA_DIR}`);
+  console.log('API endpoints available:');
+  console.log('  GET  /api/questions');
+  console.log('  POST /api/questions');
+  console.log('  GET  /api/responses');
+  console.log('  POST /api/responses');
+  console.log('  GET  /api/export');
 });
 

@@ -27,7 +27,22 @@ function setupEventListeners() {
 // Load questions from API
 async function loadQuestions() {
     try {
-        const response = await fetch(`${API_BASE}/questions`);
+        // Add timeout for Render free tier (may take 30+ seconds on first request)
+        loadingDiv.textContent = 'Loading questions... (This may take up to 30 seconds on first load)';
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+        
+        const response = await fetch(`${API_BASE}/questions`, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         questions = await response.json();
         
         if (questions.length === 0) {
@@ -66,7 +81,11 @@ async function loadQuestions() {
         renderQuestionnaire();
     } catch (error) {
         console.error('Error loading questions:', error);
-        loadingDiv.textContent = 'Error loading questions. Please refresh the page.';
+        if (error.name === 'AbortError') {
+            loadingDiv.innerHTML = 'Request timed out. The server may be starting up (Render free tier takes ~30 seconds).<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>';
+        } else {
+            loadingDiv.innerHTML = `Error loading questions: ${error.message}<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>`;
+        }
     }
 }
 
