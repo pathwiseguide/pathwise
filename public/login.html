@@ -5,9 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pathwise - Login</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .nav-header {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .nav-header .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .nav-links a, .nav-links button {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: inherit;
+            font-family: inherit;
+        }
+        
+        .nav-links a:hover, .nav-links button:hover {
+            background: #f0f4ff;
+            color: #667eea;
+        }
+        
+        .nav-links .auth-button {
+            margin-left: auto;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
+        <!-- Navigation Header -->
+        <nav class="nav-header">
+            <div class="logo">Pathwise</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/#about">About</a>
+                <a href="/#pricing">Pricing</a>
+                <a href="/payment" id="plansLink" style="display: block;">Plans</a>
+                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
+                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <a href="/login.html" id="loginLink" class="auth-button">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </nav>
         <div class="login-container">
             <div class="login-box">
                 <div class="logo">
@@ -111,6 +172,123 @@
     </div>
 
     <script src="login.js"></script>
+    <script>
+        // Check payment status (server-based, account-specific)
+        async function hasPaymentAccess() {
+            // Check server first (account-based) - requires authentication
+            try {
+                const response = await fetch('/api/payment/status', {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    // Server response is authoritative
+                    if (data.hasPayment === true) {
+                        // Sync to localStorage for consistency
+                        localStorage.setItem('paymentCompleted', 'true');
+                        return true;
+                    } else {
+                        // Clear localStorage if server says no payment
+                        localStorage.removeItem('paymentCompleted');
+                        localStorage.removeItem('paymentPlan');
+                        localStorage.removeItem('paymentDate');
+                        return false;
+                    }
+                } else if (response.status === 401) {
+                    // Not logged in - clear localStorage and return false
+                    localStorage.removeItem('paymentCompleted');
+                    localStorage.removeItem('paymentPlan');
+                    localStorage.removeItem('paymentDate');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+                // If server check fails, don't trust localStorage - return false for account-based security
+                return false;
+            }
+            
+            return false;
+        }
+
+        // Check authentication status and update navigation
+        async function checkAuthAndUpdateNav() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const loginLink = document.getElementById('loginLink');
+                const logoutButton = document.getElementById('logoutButton');
+                const counselorLink = document.getElementById('counselorLink');
+                
+                if (data.authenticated) {
+                    // User is logged in - show logout, hide login
+                    if (loginLink) loginLink.style.display = 'none';
+                    if (logoutButton) logoutButton.style.display = 'block';
+                } else {
+                    // User is not logged in - show login, hide logout
+                    if (loginLink) loginLink.style.display = 'block';
+                    if (logoutButton) logoutButton.style.display = 'none';
+                }
+                
+                // Show Counselor button and hide Plans link if payment completed
+                const plansLink = document.getElementById('plansLink');
+                const responsesLink = document.getElementById('responsesLink');
+                if (counselorLink && plansLink) {
+                    const hasAccess = await hasPaymentAccess();
+                    if (hasAccess) {
+                        counselorLink.style.display = 'block';
+                        plansLink.style.display = 'none';
+                        if (responsesLink) responsesLink.style.display = 'block';
+                    } else {
+                        counselorLink.style.display = 'none';
+                        plansLink.style.display = 'block';
+                        if (responsesLink) responsesLink.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+                // On error, show login button
+                const loginLink = document.getElementById('loginLink');
+                const logoutButton = document.getElementById('logoutButton');
+                if (loginLink) loginLink.style.display = 'block';
+                if (logoutButton) logoutButton.style.display = 'none';
+            }
+        }
+
+        // Handle logout
+        async function handleLogout() {
+            try {
+                const response = await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                // Always redirect to login, even if request fails
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                // Redirect anyway
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthAndUpdateNav();
+            
+            // Set up logout button click handler
+            const logoutButton = document.getElementById('logoutButton');
+            if (logoutButton) {
+                logoutButton.addEventListener('click', handleLogout);
+            }
+        });
+    </script>
 </body>
 </html>
+
+
+
+
 

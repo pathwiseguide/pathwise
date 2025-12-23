@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test ChatGPT Prompt - Pathwise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .admin-header {
+            margin-bottom: 30px;
+        }
+
+        .admin-header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .response-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .response-section h2 {
+            margin-top: 0;
+            color: #667eea;
+        }
+
+        .response-content {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            display: none;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .context-section {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .context-section h3 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 1em;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-header">
+            <div class="logo">Pathwise</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/admin.html">Edit Questions</a>
+                <a href="/documents.html">Documents</a>
+                <a href="/test-prompt.html">Test Prompt</a>
+            </div>
+        </nav>
+
+        <div class="admin-container">
+            <div class="admin-header">
+                <h1>Test ChatGPT Prompt</h1>
+                <p>Test what ChatGPT will output for any prompt. Useful for testing question prompts before using them.</p>
+            </div>
+
+            <div id="message" class="message"></div>
+
+            <div class="info-box">
+                <p><strong>Tip:</strong> Use <code>{answer}</code> to test with a placeholder answer, or <code>{allAnswers}</code> to test with sample questionnaire responses.</p>
+                <p><strong>Example:</strong> "Based on your answer '{answer}', here's what I think..."</p>
+            </div>
+
+            <div class="form-group">
+                <label>Test Prompt</label>
+                <textarea id="testPrompt" rows="6" placeholder="Enter your prompt here. Use {answer} for a single answer or {allAnswers} for all answers.">Based on your answer "{answer}", here's what I think...</textarea>
+            </div>
+
+            <div class="context-section">
+                <h3>Test Context (Optional)</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="useSampleAnswer" checked>
+                    <label for="useSampleAnswer">Use sample answer for {answer} placeholder</label>
+                </div>
+                <div class="form-group" id="sampleAnswerGroup">
+                    <label>Sample Answer</label>
+                    <input type="text" id="sampleAnswer" value="11th grade" placeholder="Enter a sample answer">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="useSampleAnswers">
+                    <label for="useSampleAnswers">Use sample answers for {allAnswers} placeholder</label>
+                </div>
+                <div class="form-group" id="sampleAnswersGroup" style="display: none;">
+                    <label>Sample Answers (one per line, format: Question: Answer)</label>
+                    <textarea id="sampleAnswers" rows="4" placeholder="What is your grade?: 11th&#10;What is your name?: John&#10;How old are you?: 17"></textarea>
+                </div>
+            </div>
+
+            <button class="btn" onclick="testPrompt()">Test Prompt</button>
+            <button class="btn" onclick="clearResponse()" style="background: #6c757d;">Clear</button>
+
+            <div class="loading" id="loading">Testing prompt with ChatGPT...</div>
+
+            <div class="response-section" id="responseSection" style="display: none;">
+                <h2>ChatGPT Response</h2>
+                <div class="response-content" id="responseContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        // Toggle sample answers section
+        document.getElementById('useSampleAnswers').addEventListener('change', (e) => {
+            document.getElementById('sampleAnswersGroup').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Test the prompt
+        async function testPrompt() {
+            const promptInput = document.getElementById('testPrompt').value.trim();
+            
+            if (!promptInput) {
+                showMessage('Please enter a prompt to test', 'error');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const responseSection = document.getElementById('responseSection');
+            const responseContent = document.getElementById('responseContent');
+            const testBtn = document.querySelector('.btn');
+
+            // Prepare the prompt with replacements
+            let finalPrompt = promptInput;
+            
+            if (document.getElementById('useSampleAnswer').checked) {
+                const sampleAnswer = document.getElementById('sampleAnswer').value || 'sample answer';
+                finalPrompt = finalPrompt.replace(/{answer}/g, sampleAnswer);
+            }
+
+            if (document.getElementById('useSampleAnswers').checked) {
+                const sampleAnswersText = document.getElementById('sampleAnswers').value || 'Question 1: Answer 1\nQuestion 2: Answer 2';
+                finalPrompt = finalPrompt.replace(/{allAnswers}/g, sampleAnswersText);
+            }
+
+            // Show what will be sent
+            console.log('Testing prompt:', finalPrompt);
+
+            loading.style.display = 'block';
+            responseSection.style.display = 'none';
+            testBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/chat/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        prompt: finalPrompt
+                    })
+                });
+
+                const result = await response.json();
+
+                loading.style.display = 'none';
+                testBtn.disabled = false;
+
+                if (result.success) {
+                    responseContent.textContent = result.message;
+                    responseSection.style.display = 'block';
+                    showMessage('Prompt tested successfully!', 'success');
+                } else {
+                    showMessage('Error: ' + result.message, 'error');
+                }
+            } catch (error) {
+                loading.style.display = 'none';
+                testBtn.disabled = false;
+                showMessage('Error testing prompt: ' + error.message, 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Clear response
+        function clearResponse() {
+            document.getElementById('responseSection').style.display = 'none';
+            document.getElementById('responseContent').textContent = '';
+        }
+
+        // Show message
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
+
+

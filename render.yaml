@@ -1,10 +1,19 @@
 services:
   - type: web
-    name: questionnaire-app
+    name: pathwise
     env: node
     buildCommand: npm install
     startCommand: npm start
+    plan: free
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
+      - key: SESSION_SECRET
+        value: UOnvS0yeDijxYQlVgb42ZGWATKPJ8aorstwR1CBkm7Mu5qcLXfI9d6hpNE3HFz
+
+
+
+
 

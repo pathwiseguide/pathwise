@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questionnaire - Pathwise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .nav-header {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-header .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a, .nav-links button {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: inherit;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover, .nav-links button:hover {
+            background: #f0f4ff;
+            color: #667eea;
+        }
+
+        .nav-links .auth-button {
+            margin-left: auto;
+        }
+
+        .payment-required {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .payment-required h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+
+        .payment-required p {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Chat Interface Styles */
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            margin: 0 auto;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-bot {
+            align-self: flex-start;
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            line-height: 1.6;
+        }
+
+        .message-bot p {
+            margin: 8px 0;
+        }
+
+        .message-bot p:first-child {
+            margin-top: 0;
+        }
+
+        .message-bot p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-bot h2, .message-bot h3 {
+            margin: 12px 0 8px 0;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        .message-bot h2 {
+            font-size: 1.2em;
+        }
+
+        .message-bot ul, .message-bot ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+
+        .message-bot li {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+
+        .message-bot strong {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .message-bot em {
+            font-style: italic;
+        }
+
+        .message-bot code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .message-bot pre {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .message-bot pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .message-user {
+            align-self: flex-end;
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-typing {
+            align-self: flex-start;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 24px;
+            font-size: 1rem;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .chat-send-btn {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .chat-send-btn:hover {
+            background: #5568d3;
+        }
+
+        .chat-send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .option-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .option-btn {
+            padding: 10px 16px;
+            background: #f0f4ff;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            color: #667eea;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .option-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .option-btn.selected {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation Header -->
+        <header class="nav-header">
+            <div class="logo">Pathwise</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/payment" id="plansLink" style="display: none;">Plans</a>
+                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
+                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <a href="/login.html" id="loginLink" class="auth-button">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </header>
+
+        <!-- Payment Required Message (shown if no payment) -->
+        <div id="paymentRequired" class="payment-required" style="display: none;">
+            <h2>Payment Required</h2>
+            <p>You need to complete payment to access the questionnaire.</p>
+            <button class="btn-primary" onclick="window.location.href='/payment'" style="padding: 15px 40px; font-size: 1.1rem; margin-top: 20px;">
+                Choose a Plan
+            </button>
+        </div>
+
+        <!-- Questionnaire Container -->
+        <div id="questionnaireContainer" style="display: none;">
+            <div id="loading" class="loading" style="display: block;">Loading questions...</div>
+            <div class="chat-container" style="display: none;">
+                <div id="chatMessages" class="chat-messages"></div>
+                <div id="chatInputArea" class="chat-input-area" style="display: none;">
+                    <div class="chat-input-wrapper">
+                        <textarea id="chatInput" class="chat-input" placeholder="Type your answer..." rows="1"></textarea>
+                        <button id="chatSendBtn" class="chat-send-btn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Check payment status (server-based, account-specific)
+        async function hasPaymentAccess() {
+            // Check server first (account-based) - requires authentication
+            try {
+                const response = await fetch('/api/payment/status', {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    // Server response is authoritative
+                    if (data.hasPayment === true) {
+                        // Sync to localStorage for consistency
+                        localStorage.setItem('paymentCompleted', 'true');
+                        return true;
+                    } else {
+                        // Clear localStorage if server says no payment
+                        localStorage.removeItem('paymentCompleted');
+                        localStorage.removeItem('paymentPlan');
+                        localStorage.removeItem('paymentDate');
+                        return false;
+                    }
+                } else if (response.status === 401) {
+                    // Not logged in - clear localStorage and return false
+                    localStorage.removeItem('paymentCompleted');
+                    localStorage.removeItem('paymentPlan');
+                    localStorage.removeItem('paymentDate');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+                // If server check fails, don't trust localStorage - return false for account-based security
+                return false;
+            }
+            
+            return false;
+        }
+
+        // Check payment status before allowing access
+        async function checkPaymentAccess() {
+            const paymentCompleted = await hasPaymentAccess();
+            const paymentRequired = document.getElementById('paymentRequired');
+            const questionnaireContainer = document.getElementById('questionnaireContainer');
+            
+            if (!paymentCompleted) {
+                paymentRequired.style.display = 'block';
+                questionnaireContainer.style.display = 'none';
+                return false;
+            } else {
+                paymentRequired.style.display = 'none';
+                questionnaireContainer.style.display = 'block';
+                return true;
+            }
+        }
+
+        // Check authentication status and update navigation
+        async function checkAuthAndUpdateNav() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const loginLink = document.getElementById('loginLink');
+                const logoutButton = document.getElementById('logoutButton');
+                const counselorLink = document.getElementById('counselorLink');
+                
+                if (data.authenticated) {
+                    if (loginLink) loginLink.style.display = 'none';
+                    if (logoutButton) logoutButton.style.display = 'block';
+                } else {
+                    if (loginLink) loginLink.style.display = 'block';
+                    if (logoutButton) logoutButton.style.display = 'none';
+                }
+                
+                // Show Counselor button and hide Plans link if payment completed
+                const plansLink = document.getElementById('plansLink');
+                const responsesLink = document.getElementById('responsesLink');
+                if (counselorLink && plansLink) {
+                    const hasAccess = await hasPaymentAccess();
+                    if (hasAccess) {
+                        counselorLink.style.display = 'block';
+                        plansLink.style.display = 'none';
+                        if (responsesLink) responsesLink.style.display = 'block';
+                    } else {
+                        counselorLink.style.display = 'none';
+                        plansLink.style.display = 'block';
+                        if (responsesLink) responsesLink.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        }
+
+        // Handle logout
+        async function handleLogout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login.html';
+            }
+        }
+
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            // First check payment access (this will show/hide questionnaire container)
+            await checkPaymentAccess();
+            
+            // Then update navigation based on payment status
+            await checkAuthAndUpdateNav();
+            
+            const logoutButton = document.getElementById('logoutButton');
+            if (logoutButton) {
+                logoutButton.addEventListener('click', handleLogout);
+            }
+        });
+    </script>
+</body>
+</html>
+

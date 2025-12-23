@@ -1,0 +1,398 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose Payment Plan - Pathwise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .payment-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .payment-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .payment-header h1 {
+            color: #667eea;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .payment-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .plan-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s;
+            background: #f8f9fa;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .plan-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .plan-card.selected {
+            border-color: #667eea;
+            background: #f0f4ff;
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .plan-card .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .plan-card .plan-price {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #667eea;
+            margin: 20px 0;
+        }
+
+        .plan-card .plan-price-label {
+            color: #666;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .plan-card .plan-features {
+            list-style: none;
+            text-align: left;
+            margin: 20px 0;
+            padding: 0;
+        }
+
+        .plan-card .plan-features li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .plan-card .plan-features li:last-child {
+            border-bottom: none;
+        }
+
+        .plan-card .plan-features li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .payment-actions {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background: #f0f4ff;
+        }
+
+        .nav-header {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-header .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a, .nav-links button {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: inherit;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover, .nav-links button:hover {
+            background: #f0f4ff;
+            color: #667eea;
+        }
+
+        .nav-links .auth-button {
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation Header -->
+        <nav class="nav-header">
+            <div class="logo">Pathwise</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/payment" id="plansLink" style="display: block;">Plans</a>
+                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
+                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <a href="/login.html" id="loginLink" class="auth-button">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </nav>
+
+        <div class="payment-container">
+            <div class="payment-header">
+                <h1>Premium Plan</h1>
+                <p>Complete your payment to access the questionnaire</p>
+            </div>
+
+            <div class="plans-grid" id="plansGrid" style="display: flex; justify-content: center;">
+                <div class="plan-card selected" data-plan="premium" data-price="100" style="max-width: 400px;">
+                    <div class="plan-name">Premium Plan</div>
+                    <div class="plan-price">$100</div>
+                    <div class="plan-price-label">One-time payment</div>
+                    <ul class="plan-features">
+                        <li>Full access to questionnaire</li>
+                        <li>Unlimited responses</li>
+                        <li>Priority support</li>
+                        <li>Advanced data export</li>
+                        <li>Custom question sets</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="payment-actions">
+                <button class="btn-secondary" onclick="window.location.href='/'">Cancel</button>
+                <button class="btn-primary" id="proceedButton" onclick="proceedToPayment()">Proceed to Payment</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedPlan = 'premium';
+        let selectedPrice = 100;
+
+        // Only one plan, so it's always selected
+
+        // Proceed to payment processing page
+        function proceedToPayment() {
+            // Store selected plan in sessionStorage
+            sessionStorage.setItem('selectedPlan', selectedPlan);
+            sessionStorage.setItem('selectedPrice', selectedPrice);
+            // Redirect to payment processing page
+            window.location.href = '/payment-process.html';
+        }
+
+        // Check payment status (server-based, account-specific)
+        async function hasPaymentAccess() {
+            // Check server first (account-based) - requires authentication
+            try {
+                const response = await fetch('/api/payment/status', {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    // Server response is authoritative
+                    if (data.hasPayment === true) {
+                        // Sync to localStorage for consistency
+                        localStorage.setItem('paymentCompleted', 'true');
+                        return true;
+                    } else {
+                        // Clear localStorage if server says no payment
+                        localStorage.removeItem('paymentCompleted');
+                        localStorage.removeItem('paymentPlan');
+                        localStorage.removeItem('paymentDate');
+                        return false;
+                    }
+                } else if (response.status === 401) {
+                    // Not logged in - clear localStorage and return false
+                    localStorage.removeItem('paymentCompleted');
+                    localStorage.removeItem('paymentPlan');
+                    localStorage.removeItem('paymentDate');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+                // If server check fails, don't trust localStorage - return false for account-based security
+                return false;
+            }
+            
+            return false;
+        }
+
+        // Check authentication status and update navigation
+        async function checkAuthAndUpdateNav() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const loginLink = document.getElementById('loginLink');
+                const logoutButton = document.getElementById('logoutButton');
+                const counselorLink = document.getElementById('counselorLink');
+                
+                if (data.authenticated) {
+                    if (loginLink) loginLink.style.display = 'none';
+                    if (logoutButton) logoutButton.style.display = 'block';
+                } else {
+                    if (loginLink) loginLink.style.display = 'block';
+                    if (logoutButton) logoutButton.style.display = 'none';
+                }
+                
+                // Show Counselor button and hide Plans link if payment completed
+                const plansLink = document.getElementById('plansLink');
+                const responsesLink = document.getElementById('responsesLink');
+                if (counselorLink && plansLink) {
+                    const hasAccess = await hasPaymentAccess();
+                    if (hasAccess) {
+                        counselorLink.style.display = 'block';
+                        plansLink.style.display = 'none';
+                        if (responsesLink) responsesLink.style.display = 'block';
+                    } else {
+                        counselorLink.style.display = 'none';
+                        plansLink.style.display = 'block';
+                        if (responsesLink) responsesLink.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        }
+
+        // Handle logout
+        async function handleLogout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Check if payment already completed and redirect
+        async function checkIfAlreadyPaid() {
+            const hasAccess = await hasPaymentAccess();
+            if (hasAccess) {
+                // Already paid, redirect to questionnaire
+                window.location.href = '/questionnaire.html';
+            }
+        }
+
+        // Check if user is logged in
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                return data.authenticated === true;
+            } catch (error) {
+                console.error('Auth check error:', error);
+                return false;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check if logged in - if not, show message but allow viewing plans
+            const isAuthenticated = await checkAuthStatus();
+            if (!isAuthenticated) {
+                // Show a message that they need to log in to complete payment
+                const paymentContainer = document.querySelector('.payment-container');
+                if (paymentContainer) {
+                    const loginNotice = document.createElement('div');
+                    loginNotice.style.cssText = 'background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;';
+                    loginNotice.innerHTML = '<strong>Note:</strong> Please <a href="/login.html" style="color: #667eea; text-decoration: underline;">log in</a> before completing payment.';
+                    paymentContainer.insertBefore(loginNotice, paymentContainer.firstChild);
+                }
+            }
+
+            await checkIfAlreadyPaid();
+            await checkAuthAndUpdateNav();
+            
+            const logoutButton = document.getElementById('logoutButton');
+            if (logoutButton) {
+                logoutButton.addEventListener('click', handleLogout);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Responses - Pathwise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .nav-header {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-header .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a, .nav-links button {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: inherit;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover, .nav-links button:hover {
+            background: #f0f4ff;
+            color: #667eea;
+        }
+
+        .nav-links .auth-button {
+            margin-left: auto;
+        }
+
+        .responses-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .responses-header {
+            margin-bottom: 30px;
+        }
+
+        .responses-header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .response-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            transition: all 0.3s;
+        }
+
+        .response-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+
+        .response-card.editing {
+            border-color: #667eea;
+            background: white;
+        }
+
+        .response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .response-date {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .response-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-edit, .btn-delete, .btn-save, .btn-cancel {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-edit {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #5568d3;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .btn-save {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #218838;
+        }
+
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #5a6268;
+        }
+
+        .response-answers {
+            margin-top: 15px;
+        }
+
+        .answer-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .answer-item.editing {
+            border-left-color: #28a745;
+        }
+
+        .answer-question {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .answer-value {
+            color: #666;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 5px;
+        }
+
+        .answer-value.editing {
+            background: white;
+            border: 2px solid #667eea;
+            padding: 10px;
+        }
+
+        .answer-value input,
+        .answer-value textarea,
+        .answer-value select {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .answer-value input:focus,
+        .answer-value textarea:focus,
+        .answer-value select:focus {
+            outline: 2px solid #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .empty-state p {
+            margin-bottom: 30px;
+        }
+
+        .option-tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin: 5px 5px 0 0;
+            font-size: 0.9rem;
+        }
+
+        .new-response-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .new-response-btn:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation Header -->
+        <header class="nav-header">
+            <div class="logo">Pathwise</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/payment" id="plansLink" style="display: none;">Plans</a>
+                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
+                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <a href="/login.html" id="loginLink" class="auth-button">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </header>
+
+        <div class="responses-container">
+            <div class="responses-header">
+                <h1>My Responses</h1>
+                <p>View and edit all your submitted responses</p>
+            </div>
+
+            <button class="new-response-btn" onclick="window.location.href='/questionnaire.html'">+ New Response</button>
+
+            <div id="responsesList">
+                <div class="empty-state">
+                    <p>Loading your responses...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let responses = [];
+        let questions = [];
+        let editingResponseId = null;
+
+        // Check authentication and load data
+        async function initialize() {
+            // Check auth
+            try {
+                const authResponse = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const authData = await authResponse.json();
+                
+                if (!authData.authenticated) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                // Update navigation
+                updateNavigation(authData.authenticated);
+
+                // Load questions and responses
+                await Promise.all([loadQuestions(), loadResponses()]);
+            } catch (error) {
+                console.error('Initialization error:', error);
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Load questions
+        async function loadQuestions() {
+            try {
+                const response = await fetch('/api/questions', {
+                    credentials: 'include'
+                });
+                questions = await response.json();
+            } catch (error) {
+                console.error('Error loading questions:', error);
+            }
+        }
+
+        // Load user's responses
+        async function loadResponses() {
+            try {
+                const response = await fetch('/api/my-responses', {
+                    credentials: 'include'
+                });
+                
+                console.log('Load responses status:', response.status);
+                
+                if (response.status === 401) {
+                    alert('Please log in to view your responses.');
+                    window.location.href = '/login.html';
+                    return;
+                }
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `Server error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Loaded responses:', data);
+                
+                // Handle both array and object responses
+                if (Array.isArray(data)) {
+                    responses = data;
+                } else if (data.error) {
+                    throw new Error(data.error || data.message || 'Failed to load responses');
+                } else {
+                    responses = [];
+                }
+                
+                renderResponses();
+            } catch (error) {
+                console.error('Error loading responses:', error);
+                document.getElementById('responsesList').innerHTML = 
+                    `<div class="empty-state">
+                        <h2>Error Loading Responses</h2>
+                        <p>${error.message || 'Please refresh the page or try logging in again.'}</p>
+                        <button class="new-response-btn" onclick="location.reload()">Refresh Page</button>
+                    </div>`;
+            }
+        }
+
+        // Render all responses
+        function renderResponses() {
+            const list = document.getElementById('responsesList');
+            
+            if (responses.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No Responses Yet</h2>
+                        <p>You haven't submitted any responses yet.</p>
+                        <button class="new-response-btn" onclick="window.location.href='/questionnaire.html'">Start Your First Response</button>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = '';
+            responses.forEach((response, index) => {
+                const card = createResponseCard(response, index);
+                list.appendChild(card);
+            });
+        }
+
+        // Create response card
+        function createResponseCard(response, index) {
+            const div = document.createElement('div');
+            div.className = 'response-card';
+            div.dataset.responseId = response.id;
+            if (editingResponseId === response.id) {
+                div.classList.add('editing');
+            }
+
+            const date = new Date(response.timestamp || response.submittedAt).toLocaleString();
+            const isEditing = editingResponseId === response.id;
+
+            div.innerHTML = `
+                <div class="response-header">
+                    <div>
+                        <h3>Response #${index + 1}</h3>
+                        <div class="response-date">Submitted: ${date}</div>
+                    </div>
+                    <div class="response-actions">
+                        ${isEditing ? `
+                            <button class="btn-save" onclick="saveResponse('${response.id}')">Save</button>
+                            <button class="btn-cancel" onclick="cancelEdit('${response.id}')">Cancel</button>
+                        ` : `
+                            <button class="btn-edit" onclick="editResponse('${response.id}')">Edit</button>
+                            <button class="btn-delete" onclick="deleteResponse('${response.id}')">Delete</button>
+                        `}
+                    </div>
+                </div>
+                <div class="response-answers" id="answers-${response.id}"></div>
+            `;
+
+            // Render answers
+            const answersDiv = div.querySelector(`#answers-${response.id}`);
+            const responseQuestions = response.questions || questions;
+            const answers = response.answers || {};
+
+            responseQuestions.forEach(question => {
+                const answerValue = answers[question.id];
+                const answerItem = createAnswerItem(question, answerValue, response.id, isEditing);
+                answersDiv.appendChild(answerItem);
+            });
+
+            return div;
+        }
+
+        // Create answer item
+        function createAnswerItem(question, answerValue, responseId, isEditing) {
+            const div = document.createElement('div');
+            div.className = 'answer-item';
+            if (isEditing) {
+                div.classList.add('editing');
+            }
+
+            const questionText = question.text || 'Question';
+            let displayValue = '';
+
+            if (Array.isArray(answerValue)) {
+                displayValue = answerValue.join(', ');
+            } else if (answerValue !== undefined && answerValue !== null) {
+                displayValue = String(answerValue);
+            } else {
+                displayValue = '(No answer)';
+            }
+
+            if (isEditing) {
+                div.innerHTML = `
+                    <div class="answer-question">${escapeHtml(questionText)}</div>
+                    <div class="answer-value editing">${createEditableInput(question, answerValue, responseId, question.id)}</div>
+                `;
+            } else {
+                div.innerHTML = `
+                    <div class="answer-question">${escapeHtml(questionText)}</div>
+                    <div class="answer-value">${escapeHtml(displayValue)}</div>
+                `;
+            }
+
+            return div;
+        }
+
+        // Create editable input based on question type
+        function createEditableInput(question, currentValue, responseId, questionId) {
+            const inputId = `edit-${responseId}-${questionId}`;
+            
+            switch (question.type) {
+                case 'textarea':
+                    return `<textarea id="${inputId}" data-question-id="${questionId}">${escapeHtml(currentValue || '')}</textarea>`;
+                
+                case 'radio':
+                case 'select':
+                    if (!question.options) return `<input type="text" id="${inputId}" value="${escapeHtml(currentValue || '')}" data-question-id="${questionId}">`;
+                    let selectHtml = `<select id="${inputId}" data-question-id="${questionId}">`;
+                    if (!question.required) {
+                        selectHtml += `<option value="">-- Select --</option>`;
+                    }
+                    question.options.forEach(option => {
+                        const selected = currentValue === option ? 'selected' : '';
+                        selectHtml += `<option value="${escapeHtml(option)}" ${selected}>${escapeHtml(option)}</option>`;
+                    });
+                    selectHtml += `</select>`;
+                    return selectHtml;
+                
+                case 'checkbox':
+                    if (!question.options) return `<input type="text" id="${inputId}" value="${escapeHtml(Array.isArray(currentValue) ? currentValue.join(', ') : currentValue || '')}" data-question-id="${questionId}">`;
+                    let checkboxHtml = '';
+                    const selectedValues = Array.isArray(currentValue) ? currentValue : [];
+                    question.options.forEach(option => {
+                        const checked = selectedValues.includes(option) ? 'checked' : '';
+                        checkboxHtml += `
+                            <div style="margin: 5px 0;">
+                                <input type="checkbox" id="${inputId}-${option}" value="${escapeHtml(option)}" ${checked} data-question-id="${questionId}">
+                                <label for="${inputId}-${option}">${escapeHtml(option)}</label>
+                            </div>
+                        `;
+                    });
+                    return checkboxHtml;
+                
+                case 'email':
+                    return `<input type="email" id="${inputId}" value="${escapeHtml(currentValue || '')}" data-question-id="${questionId}">`;
+                
+                case 'number':
+                    return `<input type="number" id="${inputId}" value="${escapeHtml(currentValue || '')}" data-question-id="${questionId}">`;
+                
+                default:
+                    return `<input type="text" id="${inputId}" value="${escapeHtml(currentValue || '')}" data-question-id="${questionId}">`;
+            }
+        }
+
+        // Edit response
+        function editResponse(responseId) {
+            editingResponseId = responseId;
+            renderResponses();
+        }
+
+        // Cancel editing
+        function cancelEdit(responseId) {
+            editingResponseId = null;
+            renderResponses();
+        }
+
+        // Save response
+        async function saveResponse(responseId) {
+            const response = responses.find(r => r.id === responseId);
+            if (!response) return;
+
+            // Collect updated answers
+            const updatedAnswers = {};
+            const card = document.querySelector(`[data-response-id="${responseId}"]`);
+            const inputs = card.querySelectorAll('[data-question-id]');
+
+            inputs.forEach(input => {
+                const questionId = input.dataset.questionId;
+                if (input.type === 'checkbox') {
+                    // Handle checkboxes
+                    const checkboxes = card.querySelectorAll(`input[type="checkbox"][data-question-id="${questionId}"]:checked`);
+                    const values = Array.from(checkboxes).map(cb => cb.value);
+                    updatedAnswers[questionId] = values;
+                } else {
+                    updatedAnswers[questionId] = input.value;
+                }
+            });
+
+            // Update response object
+            response.answers = { ...response.answers, ...updatedAnswers };
+
+            try {
+                const updateResponse = await fetch(`/api/responses/${responseId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        answers: response.answers
+                    })
+                });
+
+                const result = await updateResponse.json();
+
+                if (result.success) {
+                    editingResponseId = null;
+                    // Update local responses array
+                    const index = responses.findIndex(r => r.id === responseId);
+                    if (index !== -1) {
+                        responses[index] = result.response || response;
+                    }
+                    renderResponses();
+                    alert('Response updated successfully!');
+                } else {
+                    alert('Failed to update response: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error updating response:', error);
+                alert('Error updating response. Please try again.');
+            }
+        }
+
+        // Delete response
+        async function deleteResponse(responseId) {
+            if (!confirm('Are you sure you want to delete this response? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const deleteResponse = await fetch(`/api/responses/${responseId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                const result = await deleteResponse.json();
+
+                if (result.success) {
+                    // Remove from local array
+                    responses = responses.filter(r => r.id !== responseId);
+                    renderResponses();
+                    alert('Response deleted successfully!');
+                } else {
+                    alert('Failed to delete response: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error deleting response:', error);
+                alert('Error deleting response. Please try again.');
+            }
+        }
+
+        // Update navigation
+        async function updateNavigation(isAuthenticated) {
+            const loginLink = document.getElementById('loginLink');
+            const logoutButton = document.getElementById('logoutButton');
+            const counselorLink = document.getElementById('counselorLink');
+            const plansLink = document.getElementById('plansLink');
+            const responsesLink = document.getElementById('responsesLink');
+
+            if (isAuthenticated) {
+                if (loginLink) loginLink.style.display = 'none';
+                if (logoutButton) logoutButton.style.display = 'block';
+            } else {
+                if (loginLink) loginLink.style.display = 'block';
+                if (logoutButton) logoutButton.style.display = 'none';
+            }
+
+            // Check payment status for Counselor/Plans/Responses links
+            try {
+                const paymentResponse = await fetch('/api/payment/status', {
+                    credentials: 'include'
+                });
+                if (paymentResponse.ok) {
+                    const paymentData = await paymentResponse.json();
+                    if (paymentData.hasPayment === true) {
+                        if (counselorLink) counselorLink.style.display = 'block';
+                        if (plansLink) plansLink.style.display = 'none';
+                        if (responsesLink) responsesLink.style.display = 'block';
+                    } else {
+                        if (counselorLink) counselorLink.style.display = 'none';
+                        if (plansLink) plansLink.style.display = 'block';
+                        if (responsesLink) responsesLink.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+            }
+        }
+
+        // Handle logout
+        async function handleLogout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initialize();
+
+            const logoutButton = document.getElementById('logoutButton');
+            if (logoutButton) {
+                logoutButton.addEventListener('click', handleLogout);
+            }
+        });
+    </script>
+</body>
+</html>
+

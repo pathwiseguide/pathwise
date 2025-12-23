@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Questions - Pathwise Admin</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .admin-header {
+            margin-bottom: 30px;
+        }
+
+        .admin-header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .question-editor {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+        }
+
+        .question-editor h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .options-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .options-input input {
+            flex: 1;
+        }
+
+        .options-list {
+            margin-top: 10px;
+        }
+
+        .option-tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin: 5px 5px 0 0;
+            font-size: 0.9rem;
+        }
+
+        .option-tag .remove {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-secondary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .add-question-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .add-question-btn:hover {
+            background: #5568d3;
+        }
+
+        .save-all-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .save-all-btn:hover {
+            background: #218838;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        .admin-section {
+            margin-top: 40px;
+        }
+
+        .message-item {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+
+        .message-item h4 {
+            margin-top: 0;
+            color: #667eea;
+        }
+
+        .delay-input {
+            width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-container">
+            <div class="admin-header">
+                <h1>Edit Questions</h1>
+                <p>Manage your questionnaire questions here. Changes are saved to the server.</p>
+            </div>
+
+            <div id="questionsList"></div>
+
+            <button class="add-question-btn" onclick="addNewQuestion()">+ Add New Question</button>
+
+            <button class="save-all-btn" onclick="saveAllQuestions()">Save All Questions</button>
+
+            <!-- Post-College Recommendations Messages Section -->
+            <div class="admin-section" style="margin-top: 50px; padding-top: 30px; border-top: 2px solid #e0e0e0;">
+                <div class="admin-header">
+                    <h2>Post-College Recommendations Questions</h2>
+                    <p>Configure interactive questions that appear after college recommendations are shown. These work like regular questions - they can have options, text input, and trigger ChatGPT responses. All questions are optional by default.</p>
+                </div>
+
+                <div id="postCollegeMessagesList"></div>
+
+                <button class="add-question-btn" onclick="addPostCollegeQuestion()" style="background: #667eea;">+ Add Question</button>
+
+                <!-- Final Message Configuration -->
+                <div class="admin-section" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h3 style="margin-top: 0; color: #667eea;">Final Message Before Chat Mode</h3>
+                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">This message will appear after all post-college questions are completed, before transitioning to direct ChatGPT chat mode.</p>
+                    <div class="form-group">
+                        <label>Final Message Text</label>
+                        <textarea id="finalMessageText" rows="3" placeholder="Enter a final message to display before chat mode..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
+                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Leave empty to skip the final message and go directly to chat mode.</p>
+                    </div>
+                </div>
+
+                <button class="save-all-btn" onclick="savePostCollegeMessages()" style="background: #667eea;">Save Post-College Questions</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let questions = [];
+
+        // Load questions on page load
+        async function loadQuestions() {
+            try {
+                const response = await fetch('/api/questions', {
+                    credentials: 'include'
+                });
+                
+                if (response.status === 401) {
+                    alert('Please log in to edit questions.');
+                    window.location.href = '/login.html';
+                    return;
+                }
+                
+                questions = await response.json();
+                renderQuestions();
+            } catch (error) {
+                console.error('Error loading questions:', error);
+                alert('Failed to load questions. Please refresh the page.');
+            }
+        }
+
+        // Render all questions
+        function renderQuestions() {
+            const list = document.getElementById('questionsList');
+            list.innerHTML = '';
+
+            questions.forEach((question, index) => {
+                const editor = createQuestionEditor(question, index);
+                list.appendChild(editor);
+            });
+        }
+
+        // Create question editor
+        function createQuestionEditor(question, index) {
+            const div = document.createElement('div');
+            div.className = 'question-editor';
+            div.dataset.index = index;
+
+            const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+
+            div.innerHTML = `
+                <h3>Question ${index + 1}</h3>
+                <div class="form-group">
+                    <label>Question Text</label>
+                    <input type="text" class="question-text" value="${escapeHtml(question.text)}" placeholder="Enter question text">
+                </div>
+                <div class="form-group">
+                    <label>Question Type</label>
+                    <select class="question-type" onchange="updateQuestionType(${index})">
+                        <option value="text" ${question.type === 'text' ? 'selected' : ''}>Text</option>
+                        <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email</option>
+                        <option value="number" ${question.type === 'number' ? 'selected' : ''}>Number</option>
+                        <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Textarea</option>
+                        <option value="radio" ${question.type === 'radio' ? 'selected' : ''}>Radio Buttons</option>
+                        <option value="checkbox" ${question.type === 'checkbox' ? 'selected' : ''}>Checkboxes</option>
+                        <option value="select" ${question.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" class="question-required" ${question.required ? 'checked' : ''} id="required-${index}">
+                        <label for="required-${index}">Required</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Multiple Text Bubbles (Optional)</label>
+                    <p style="color: #666; font-size: 0.85em; margin-bottom: 10px;">Enter multiple messages to display as separate chat bubbles. One per line. Leave empty to use single question text.</p>
+                    <textarea class="question-text-bubbles" placeholder="Enter each message on a new line...&#10;Message 1&#10;Message 2&#10;Message 3" rows="4">${question.textBubbles ? question.textBubbles.join('\n') : ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>ChatGPT Prompt (Optional)</label>
+                    <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for ChatGPT when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip ChatGPT response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to ChatGPT after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                </div>
+                <div class="form-group">
+                    <label>Use Only Specific Question Answer (Optional)</label>
+                    <input type="text" class="question-specific-answer-id" placeholder="Enter question ID (e.g., q1, q2) to use only that question's answer. Leave empty to use all answers." value="${question.specificAnswerQuestionId || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">If specified, only this question's answer will be used in the prompt (ignores {allAnswers}). Use the question ID from your questions list.</p>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" class="question-use-rag" ${question.useRAG ? 'checked' : ''} id="useRAG-${index}">
+                        <label for="useRAG-${index}" style="font-weight: 600;">Enable RAG (Search uploaded documents)</label>
+                    </div>
+                    <div class="form-group" id="ragQueryGroup-${index}" style="margin-top: 10px; ${question.useRAG ? '' : 'display: none;'}">
+                        <label>RAG Search Query</label>
+                        <input type="text" class="question-rag-query" placeholder="What to search for in documents (e.g., 'colleges for 11th graders', 'STEM programs')" value="${escapeHtml(question.ragQuery || '')}">
+                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Enter what to search for in your uploaded documents. You can use <strong>{answer}</strong> to include the user's answer. The search results will be available as <strong>{ragResults}</strong> in your ChatGPT prompt.</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Conditional Question (Optional)</label>
+                    <p style="color: #666; font-size: 0.85em; margin-bottom: 10px;">Show this question only if a previous answer meets certain conditions.</p>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <select class="condition-question-id" style="flex: 1; min-width: 150px;">
+                            <option value="">No condition (always show)</option>
+                        </select>
+                        <select class="condition-operator" style="width: 120px;" ${!question.condition ? 'disabled' : ''}>
+                            <option value="equals" ${question.condition?.operator === 'equals' ? 'selected' : ''}>equals</option>
+                            <option value="notEquals" ${question.condition?.operator === 'notEquals' ? 'selected' : ''}>not equals</option>
+                            <option value="contains" ${question.condition?.operator === 'contains' ? 'selected' : ''}>contains</option>
+                            <option value="notContains" ${question.condition?.operator === 'notContains' ? 'selected' : ''}>not contains</option>
+                            <option value="greaterThan" ${question.condition?.operator === 'greaterThan' ? 'selected' : ''}>greater than</option>
+                            <option value="lessThan" ${question.condition?.operator === 'lessThan' ? 'selected' : ''}>less than</option>
+                        </select>
+                        <input type="text" class="condition-value" placeholder="Value" value="${question.condition?.value || ''}" style="flex: 1; min-width: 100px;" ${!question.condition ? 'disabled' : ''}>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="toggleCondition(${index})" style="margin-top: 10px;">
+                        ${question.condition ? 'Remove Condition' : 'Add Condition'}
+                    </button>
+                </div>
+                <div class="form-group options-container" style="display: ${needsOptions ? 'block' : 'none'}">
+                    <label>Options</label>
+                    <div class="options-input">
+                        <input type="text" class="new-option-input" placeholder="Enter option text" onkeypress="if(event.key==='Enter') addOption(${index})">
+                        <button type="button" onclick="addOption(${index})">Add Option</button>
+                    </div>
+                    <div class="options-list" id="options-${index}"></div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-danger" onclick="deleteQuestion(${index})">Delete Question</button>
+                    ${index > 0 ? `<button class="btn-secondary" onclick="moveQuestion(${index}, -1)">Move Up</button>` : ''}
+                    ${index < questions.length - 1 ? `<button class="btn-secondary" onclick="moveQuestion(${index}, 1)">Move Down</button>` : ''}
+                </div>
+            `;
+
+            // Render existing options
+            if (needsOptions && question.options) {
+                const optionsList = div.querySelector(`#options-${index}`);
+                question.options.forEach((option, optIndex) => {
+                    const tag = document.createElement('span');
+                    tag.className = 'option-tag';
+                    tag.innerHTML = `${escapeHtml(option)} <span class="remove" onclick="removeOption(${index}, ${optIndex})">×</span>`;
+                    optionsList.appendChild(tag);
+                });
+            }
+
+            // Add event listeners
+            div.querySelector('.question-text').addEventListener('input', (e) => {
+                questions[index].text = e.target.value;
+            });
+
+            div.querySelector('.question-required').addEventListener('change', (e) => {
+                questions[index].required = e.target.checked;
+            });
+
+            div.querySelector('.question-chat-prompt').addEventListener('input', (e) => {
+                questions[index].chatPrompt = e.target.value;
+            });
+            
+            // Handle specific answer question ID
+            const specificAnswerInput = div.querySelector('.question-specific-answer-id');
+            if (specificAnswerInput) {
+                specificAnswerInput.addEventListener('input', (e) => {
+                    const value = e.target.value.trim();
+                    if (value) {
+                        questions[index].specificAnswerQuestionId = value;
+                    } else {
+                        delete questions[index].specificAnswerQuestionId;
+                    }
+                });
+            }
+
+            // RAG checkbox and query
+            const useRAGCheckbox = div.querySelector('.question-use-rag');
+            const ragQueryGroup = div.querySelector(`#ragQueryGroup-${index}`);
+            const ragQueryInput = div.querySelector('.question-rag-query');
+
+            useRAGCheckbox.addEventListener('change', (e) => {
+                questions[index].useRAG = e.target.checked;
+                ragQueryGroup.style.display = e.target.checked ? 'block' : 'none';
+            });
+
+            ragQueryInput.addEventListener('input', (e) => {
+                questions[index].ragQuery = e.target.value;
+            });
+
+            div.querySelector('.question-text-bubbles').addEventListener('input', (e) => {
+                const bubbles = e.target.value.split('\n').filter(b => b.trim());
+                if (bubbles.length > 0) {
+                    questions[index].textBubbles = bubbles;
+                } else {
+                    delete questions[index].textBubbles;
+                }
+            });
+
+            // Setup condition dropdown
+            const conditionQuestionSelect = div.querySelector('.condition-question-id');
+            const conditionOperator = div.querySelector('.condition-operator');
+            const conditionValue = div.querySelector('.condition-value');
+            
+            // Populate with previous questions
+            for (let i = 0; i < index; i++) {
+                const opt = document.createElement('option');
+                opt.value = questions[i].id;
+                opt.textContent = `${i + 1}. ${questions[i].text.substring(0, 50)}${questions[i].text.length > 50 ? '...' : ''}`;
+                if (question.condition && question.condition.questionId === questions[i].id) {
+                    opt.selected = true;
+                }
+                conditionQuestionSelect.appendChild(opt);
+            }
+
+            conditionQuestionSelect.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    if (!questions[index].condition) {
+                        questions[index].condition = { questionId: e.target.value, operator: 'equals', value: '' };
+                    } else {
+                        questions[index].condition.questionId = e.target.value;
+                    }
+                    conditionOperator.disabled = false;
+                    conditionValue.disabled = false;
+                } else {
+                    delete questions[index].condition;
+                    conditionOperator.disabled = true;
+                    conditionValue.disabled = true;
+                }
+            });
+
+            conditionOperator.addEventListener('change', (e) => {
+                if (questions[index].condition) {
+                    questions[index].condition.operator = e.target.value;
+                }
+            });
+
+            conditionValue.addEventListener('input', (e) => {
+                if (questions[index].condition) {
+                    questions[index].condition.value = e.target.value;
+                }
+            });
+
+            return div;
+        }
+
+        // Toggle condition for a question
+        function toggleCondition(index) {
+            const question = questions[index];
+            const conditionQuestionSelect = document.querySelector(`[data-index="${index}"] .condition-question-id`);
+            const conditionOperator = document.querySelector(`[data-index="${index}"] .condition-operator`);
+            const conditionValue = document.querySelector(`[data-index="${index}"] .condition-value`);
+            const toggleBtn = event.target;
+            
+            if (question.condition) {
+                // Remove condition
+                delete question.condition;
+                conditionQuestionSelect.value = '';
+                conditionOperator.disabled = true;
+                conditionValue.disabled = true;
+                toggleBtn.textContent = 'Add Condition';
+            } else {
+                // Add condition
+                question.condition = { questionId: '', operator: 'equals', value: '' };
+                conditionOperator.disabled = false;
+                conditionValue.disabled = false;
+                toggleBtn.textContent = 'Remove Condition';
+            }
+        }
+
+        // Update question type
+        function updateQuestionType(index) {
+            const select = document.querySelector(`[data-index="${index}"] .question-type`);
+            const newType = select.value;
+            questions[index].type = newType;
+
+            const needsOptions = ['radio', 'checkbox', 'select'].includes(newType);
+            const optionsContainer = document.querySelector(`[data-index="${index}"] .options-container`);
+            optionsContainer.style.display = needsOptions ? 'block' : 'none';
+
+            if (needsOptions && !questions[index].options) {
+                questions[index].options = [];
+            }
+        }
+
+        // Add option
+        function addOption(index) {
+            const input = document.querySelector(`[data-index="${index}"] .new-option-input`);
+            const value = input.value.trim();
+            
+            if (!value) return;
+
+            if (!questions[index].options) {
+                questions[index].options = [];
+            }
+
+            questions[index].options.push(value);
+            input.value = '';
+
+            // Re-render options
+            const optionsList = document.querySelector(`[data-index="${index}"] #options-${index}`);
+            optionsList.innerHTML = '';
+            questions[index].options.forEach((option, optIndex) => {
+                const tag = document.createElement('span');
+                tag.className = 'option-tag';
+                tag.innerHTML = `${escapeHtml(option)} <span class="remove" onclick="removeOption(${index}, ${optIndex})">×</span>`;
+                optionsList.appendChild(tag);
+            });
+        }
+
+        // Remove option
+        function removeOption(questionIndex, optionIndex) {
+            questions[questionIndex].options.splice(optionIndex, 1);
+            renderQuestions();
+        }
+
+        // Add new question
+        function addNewQuestion() {
+            const newQuestion = {
+                id: Date.now().toString(),
+                text: 'New Question',
+                type: 'text',
+                required: false
+            };
+            questions.push(newQuestion);
+            renderQuestions();
+        }
+
+        // Delete question
+        function deleteQuestion(index) {
+            if (confirm('Are you sure you want to delete this question?')) {
+                questions.splice(index, 1);
+                renderQuestions();
+            }
+        }
+
+        // Move question
+        function moveQuestion(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex >= 0 && newIndex < questions.length) {
+                // Swap questions
+                [questions[index], questions[newIndex]] = [questions[newIndex], questions[index]];
+                
+                // Re-render to show new order
+                renderQuestions();
+                
+                // Scroll to the moved question
+                setTimeout(() => {
+                    const movedQuestion = document.querySelector(`[data-index="${newIndex}"]`);
+                    if (movedQuestion) {
+                        movedQuestion.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Highlight the moved question briefly
+                        movedQuestion.style.transition = 'box-shadow 0.3s';
+                        movedQuestion.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.5)';
+                        setTimeout(() => {
+                            movedQuestion.style.boxShadow = '';
+                        }, 1000);
+                    }
+                }, 100);
+            }
+        }
+
+        // Save all questions
+        async function saveAllQuestions() {
+            // Ensure all questions have IDs
+            questions.forEach((q, index) => {
+                if (!q.id) {
+                    q.id = Date.now().toString() + index;
+                }
+            });
+
+            try {
+                const response = await fetch('/api/questions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(questions)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Questions saved successfully!');
+                } else {
+                    alert('Failed to save questions: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving questions:', error);
+                alert('Error saving questions. Please try again.');
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Post-College Recommendations Questions
+        let postCollegeQuestions = [];
+        let finalMessage = '';
+
+        // Load post-college questions
+        async function loadPostCollegeMessages() {
+            try {
+                const response = await fetch('/api/post-college-messages', {
+                    credentials: 'include'
+                });
+                
+                if (response.status === 401) {
+                    console.log('Not logged in for post-college questions');
+                    return;
+                }
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Loaded post-college data:', data);
+                    // Handle both old format (array of messages) and new format (array of questions)
+                    if (Array.isArray(data)) {
+                        // Check if it's old format (has text and delay) or new format (has type, text, etc.)
+                        if (data.length > 0 && data[0].text && data[0].delay !== undefined && !data[0].type) {
+                            // Old format - convert to questions
+                            postCollegeQuestions = data.map((msg, idx) => ({
+                                id: `post-college-${idx}`,
+                                text: msg.text || '',
+                                type: 'text',
+                                required: false,
+                                noInput: false,
+                                options: [],
+                                chatPrompt: '',
+                                useRAG: false,
+                                ragQuery: '',
+                                textBubbles: null,
+                                condition: null
+                            }));
+                        } else {
+                            // New format - questions (array only)
+                            postCollegeQuestions = data || [];
+                            finalMessage = '';
+                            console.log('Loaded post-college questions:', postCollegeQuestions.length);
+                        }
+                    } else if (data && typeof data === 'object' && Array.isArray(data.questions)) {
+                        // New format with questions and finalMessage
+                        postCollegeQuestions = data.questions || [];
+                        finalMessage = data.finalMessage || '';
+                        console.log('Loaded post-college questions:', postCollegeQuestions.length, 'with final message');
+                    } else {
+                        postCollegeQuestions = [];
+                        finalMessage = '';
+                    }
+                } else {
+                    console.error('Failed to load post-college questions, status:', response.status);
+                    postCollegeQuestions = [];
+                }
+                console.log('Rendering', postCollegeQuestions.length, 'post-college questions');
+                renderPostCollegeMessages();
+            } catch (error) {
+                console.error('Error loading post-college questions:', error);
+                postCollegeQuestions = [];
+                renderPostCollegeMessages();
+            }
+        }
+
+        // Render post-college questions
+        function renderPostCollegeMessages() {
+            const list = document.getElementById('postCollegeMessagesList');
+            if (!list) return;
+            
+            list.innerHTML = '';
+
+            if (postCollegeQuestions.length === 0) {
+                list.innerHTML = '<p style="color: #666; font-style: italic;">No questions configured. Add questions to display after college recommendations.</p>';
+                return;
+            }
+
+            postCollegeQuestions.forEach((question, index) => {
+                const editor = createPostCollegeQuestionEditor(question, index);
+                list.appendChild(editor);
+            });
+        }
+
+        // Create post-college question editor (similar to regular question editor)
+        function createPostCollegeQuestionEditor(question, index) {
+            const div = document.createElement('div');
+            div.className = 'question-editor';
+            div.dataset.index = index;
+
+            const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+
+            div.innerHTML = `
+                <h3>Post-College Question ${index + 1}</h3>
+                <div class="form-group">
+                    <label>Question Text</label>
+                    <input type="text" class="question-text" value="${escapeHtml(question.text || '')}" placeholder="Enter question text">
+                </div>
+                <div class="form-group">
+                    <label>Question Type</label>
+                    <select class="question-type" onchange="updatePostCollegeQuestionType(${index})">
+                        <option value="text" ${question.type === 'text' ? 'selected' : ''}>Text</option>
+                        <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email</option>
+                        <option value="number" ${question.type === 'number' ? 'selected' : ''}>Number</option>
+                        <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Textarea</option>
+                        <option value="radio" ${question.type === 'radio' ? 'selected' : ''}>Radio Buttons</option>
+                        <option value="checkbox" ${question.type === 'checkbox' ? 'selected' : ''}>Checkboxes</option>
+                        <option value="select" ${question.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" class="question-required" ${question.required ? 'checked' : ''} id="post-college-required-${index}">
+                        <label for="post-college-required-${index}">Required (default: optional)</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" class="question-no-input" ${question.noInput ? 'checked' : ''} id="post-college-noInput-${index}">
+                        <label for="post-college-noInput-${index}" style="font-weight: 600;">No user input - auto-advance to next question</label>
+                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">If checked, this question will display as a message and automatically move to the next question without waiting for user input.</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Multiple Text Bubbles (Optional)</label>
+                    <p style="color: #666; font-size: 0.85em; margin-bottom: 10px;">Enter multiple messages to display as separate chat bubbles. One per line. Leave empty to use single question text.</p>
+                    <textarea class="question-text-bubbles" placeholder="Enter each message on a new line...&#10;Message 1&#10;Message 2&#10;Message 3" rows="4">${question.textBubbles ? question.textBubbles.join('\n') : ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>ChatGPT Prompt (Optional)</label>
+                    <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for ChatGPT when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip ChatGPT response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to ChatGPT after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                </div>
+                <div class="form-group">
+                    <label>Use Only Specific Question Answer (Optional)</label>
+                    <input type="text" class="question-specific-answer-id" placeholder="Enter question ID (e.g., q1, q2) to use only that question's answer. Leave empty to use all answers." value="${question.specificAnswerQuestionId || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">If specified, only this question's answer will be used in the prompt (ignores {allAnswers}). Use the question ID from your questions list.</p>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" class="question-use-rag" ${question.useRAG ? 'checked' : ''} id="post-college-useRAG-${index}">
+                        <label for="post-college-useRAG-${index}" style="font-weight: 600;">Enable RAG (Search uploaded documents)</label>
+                    </div>
+                    <div class="form-group" id="post-college-ragQueryGroup-${index}" style="margin-top: 10px; ${question.useRAG ? '' : 'display: none;'}">
+                        <label>RAG Search Query</label>
+                        <input type="text" class="question-rag-query" placeholder="What to search for in documents (e.g., 'colleges for 11th graders', 'STEM programs')" value="${escapeHtml(question.ragQuery || '')}">
+                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Enter what to search for in your uploaded documents. You can use <strong>{answer}</strong> to include the user's answer. The search results will be available as <strong>{ragResults}</strong> in your ChatGPT prompt.</p>
+                    </div>
+                </div>
+                <div class="form-group options-container" style="display: ${needsOptions ? 'block' : 'none'}">
+                    <label>Options</label>
+                    <div class="options-input">
+                        <input type="text" class="new-option-input" placeholder="Enter option text" onkeypress="if(event.key==='Enter') addPostCollegeOption(${index})">
+                        <button type="button" onclick="addPostCollegeOption(${index})">Add Option</button>
+                    </div>
+                    <div class="options-list" id="post-college-options-${index}"></div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-danger" onclick="deletePostCollegeQuestion(${index})">Delete Question</button>
+                    ${index > 0 ? `<button class="btn-secondary" onclick="movePostCollegeQuestion(${index}, -1)">Move Up</button>` : ''}
+                    ${index < postCollegeQuestions.length - 1 ? `<button class="btn-secondary" onclick="movePostCollegeQuestion(${index}, 1)">Move Down</button>` : ''}
+                </div>
+            `;
+            
+            // Populate options if they exist
+            if (needsOptions && question.options && question.options.length > 0) {
+                const optionsList = div.querySelector(`#post-college-options-${index}`);
+                question.options.forEach((option, optIndex) => {
+                    const optionDiv = document.createElement('div');
+                    optionDiv.className = 'option-item';
+                    optionDiv.innerHTML = `
+                        <span>${escapeHtml(option)}</span>
+                        <button type="button" onclick="removePostCollegeOption(${index}, ${optIndex})" class="btn-danger" style="padding: 4px 8px; font-size: 0.85em;">Remove</button>
+                    `;
+                    optionsList.appendChild(optionDiv);
+                });
+            }
+            
+            return div;
+        }
+
+        // Update post-college question type
+        function updatePostCollegeQuestionType(index) {
+            const editor = document.querySelector(`.question-editor[data-index="${index}"]`);
+            if (!editor) return;
+            
+            const typeSelect = editor.querySelector('.question-type');
+            const optionsContainer = editor.querySelector('.options-container');
+            
+            const needsOptions = ['radio', 'checkbox', 'select'].includes(typeSelect.value);
+            optionsContainer.style.display = needsOptions ? 'block' : 'none';
+            
+            // Clear options if type doesn't need them
+            if (!needsOptions) {
+                postCollegeQuestions[index].options = [];
+                const optionsList = editor.querySelector(`#post-college-options-${index}`);
+                if (optionsList) optionsList.innerHTML = '';
+            }
+        }
+
+        // Add option to post-college question
+        function addPostCollegeOption(index) {
+            const editor = document.querySelector(`.question-editor[data-index="${index}"]`);
+            if (!editor) return;
+            
+            const input = editor.querySelector('.new-option-input');
+            const optionText = input.value.trim();
+            
+            if (!optionText) return;
+            
+            if (!postCollegeQuestions[index].options) {
+                postCollegeQuestions[index].options = [];
+            }
+            
+            postCollegeQuestions[index].options.push(optionText);
+            input.value = '';
+            
+            renderPostCollegeMessages();
+        }
+
+        // Remove option from post-college question
+        function removePostCollegeOption(questionIndex, optionIndex) {
+            if (postCollegeQuestions[questionIndex].options) {
+                postCollegeQuestions[questionIndex].options.splice(optionIndex, 1);
+                renderPostCollegeMessages();
+            }
+        }
+
+        // Add new post-college question
+        function addPostCollegeQuestion() {
+            postCollegeQuestions.push({
+                id: `post-college-${Date.now()}`,
+                text: '',
+                type: 'text',
+                required: false,
+                noInput: false,
+                options: [],
+                chatPrompt: '',
+                useRAG: false,
+                ragQuery: '',
+                textBubbles: null,
+                condition: null
+            });
+            renderPostCollegeMessages();
+        }
+
+        // Delete post-college question
+        function deletePostCollegeQuestion(index) {
+            if (confirm('Are you sure you want to delete this question?')) {
+                postCollegeQuestions.splice(index, 1);
+                renderPostCollegeMessages();
+            }
+        }
+
+        // Move post-college question
+        function movePostCollegeQuestion(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex >= 0 && newIndex < postCollegeQuestions.length) {
+                [postCollegeQuestions[index], postCollegeQuestions[newIndex]] = [postCollegeQuestions[newIndex], postCollegeQuestions[index]];
+                renderPostCollegeMessages();
+            }
+        }
+
+        // Save post-college questions
+        async function savePostCollegeMessages() {
+            // Collect all question data
+            const questionEditors = document.querySelectorAll('#postCollegeMessagesList .question-editor');
+            console.log('Found question editors:', questionEditors.length);
+            
+            if (questionEditors.length === 0) {
+                // If no editors found, try to save from the postCollegeQuestions array directly
+                console.log('No editors found, using postCollegeQuestions array:', postCollegeQuestions.length);
+            // Allow saving even with no questions (just final message)
+                // Save directly from array
+                try {
+                    const response = await fetch('/api/post-college-messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify(postCollegeQuestions)
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Post-college questions saved successfully!');
+                        renderPostCollegeMessages();
+                    } else {
+                        alert('Failed to save questions: ' + (result.message || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error saving:', error);
+                    alert('Error saving questions. Please try again.');
+                }
+                return;
+            }
+            
+            const savedQuestions = [];
+            
+            questionEditors.forEach((editor) => {
+                // Get the actual index from the data attribute
+                const actualIndex = parseInt(editor.dataset.index);
+                const existingQuestion = postCollegeQuestions[actualIndex];
+                
+                const questionText = editor.querySelector('.question-text');
+                const questionType = editor.querySelector('.question-type');
+                const questionRequired = editor.querySelector('.question-required');
+                const questionNoInput = editor.querySelector('.question-no-input');
+                const questionChatPrompt = editor.querySelector('.question-chat-prompt');
+                const questionUseRAG = editor.querySelector('.question-use-rag');
+                const questionRAGQuery = editor.querySelector('.question-rag-query');
+                const questionSpecificAnswerId = editor.querySelector('.question-specific-answer-id');
+                
+                if (!questionType) {
+                    console.error('Missing question type in editor:', editor);
+                    return; // Skip this editor if question type is missing
+                }
+                // Allow empty text for optional questions
+                
+                const question = {
+                    id: existingQuestion?.id || `post-college-${Date.now()}-${actualIndex}`,
+                    text: questionText.value.trim(),
+                    type: questionType.value,
+                    required: questionRequired ? questionRequired.checked : false,
+                    noInput: questionNoInput ? questionNoInput.checked : false,
+                    options: [],
+                    chatPrompt: questionChatPrompt ? questionChatPrompt.value.trim() : '',
+                    specificAnswerQuestionId: questionSpecificAnswerId ? questionSpecificAnswerId.value.trim() : '',
+                    useRAG: questionUseRAG ? questionUseRAG.checked : false,
+                    ragQuery: questionRAGQuery ? questionRAGQuery.value.trim() : '',
+                    textBubbles: null,
+                    condition: null
+                };
+                
+                // Get text bubbles
+                const textBubblesText = editor.querySelector('.question-text-bubbles').value.trim();
+                if (textBubblesText) {
+                    question.textBubbles = textBubblesText.split('\n').filter(line => line.trim());
+                }
+                
+                // Get options if needed - use the actual index from data attribute
+                if (['radio', 'checkbox', 'select'].includes(question.type)) {
+                    const optionsList = editor.querySelector(`#post-college-options-${actualIndex}`);
+                    if (optionsList) {
+                        question.options = Array.from(optionsList.querySelectorAll('.option-item span')).map(span => span.textContent.trim());
+                    }
+                }
+                
+                // Only add if question has text (don't filter out questions with text)
+                savedQuestions.push(question);
+            });
+            
+            postCollegeQuestions = savedQuestions;
+            
+            // Get final message
+            const finalMessageTextarea = document.getElementById('finalMessageText');
+            if (finalMessageTextarea) {
+                finalMessage = finalMessageTextarea.value.trim();
+            }
+
+            // Debug: log what we're about to save
+            console.log('Saving post-college questions:', postCollegeQuestions);
+            console.log('Number of questions to save:', postCollegeQuestions.length);
+            console.log('Final message:', finalMessage);
+            
+            // Prepare data with questions and finalMessage
+            const dataToSave = {
+                questions: postCollegeQuestions,
+                finalMessage: finalMessage || ''
+            };
+            
+            // Debug: log what we're sending
+            console.log('Data to save:', JSON.stringify(dataToSave, null, 2));
+            console.log('Questions array:', Array.isArray(dataToSave.questions));
+            console.log('Questions length:', dataToSave.questions.length);
+            console.log('Has finalMessage:', 'finalMessage' in dataToSave);
+            
+            try {
+                const response = await fetch('/api/post-college-messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(dataToSave)
+                });
+
+                const result = await response.json();
+                console.log('Save response:', result);
+                console.log('Response status:', response.status);
+
+                if (result.success) {
+                    alert('Post-college questions saved successfully!');
+                    // Re-render with the saved data instead of reloading from server
+                    // This ensures the user sees their questions immediately
+                    renderPostCollegeMessages();
+                } else {
+                    alert('Failed to save questions: ' + (result.message || 'Unknown error'));
+                    console.error('Save failed:', result);
+                    // Still re-render to show what we have
+                    renderPostCollegeMessages();
+                }
+            } catch (error) {
+                console.error('Error saving post-college questions:', error);
+                alert('Error saving questions. Please try again.');
+                // Re-render to show what we have even on error
+                renderPostCollegeMessages();
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadQuestions();
+            loadPostCollegeMessages();
+        });
+    </script>
+</body>
+</html>
+
+
