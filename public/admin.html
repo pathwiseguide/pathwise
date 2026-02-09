@@ -32,6 +32,63 @@
             background: #f8f9fa;
         }
 
+        .question-editor.question-editor-dragging {
+            opacity: 0.6;
+        }
+
+        .question-editor.reorder-drop-target {
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+        }
+
+        .reorder-handle {
+            cursor: grab;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            margin: -8px -10px 12px -10px;
+            background: #e8eaed;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #555;
+            user-select: none;
+        }
+
+        .reorder-handle:active {
+            cursor: grabbing;
+        }
+
+        .reorder-handle:hover {
+            background: #dce0e5;
+        }
+
+        .position-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 8px 0;
+        }
+
+        .position-row label {
+            margin: 0;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .position-row input.position-input {
+            width: 56px;
+            padding: 6px 8px;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .position-row .position-hint {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
         .question-editor h3 {
             margin-top: 0;
             color: #333;
@@ -216,7 +273,7 @@
             <div class="admin-section" style="margin-top: 50px; padding-top: 30px; border-top: 2px solid #e0e0e0;">
                 <div class="admin-header">
                     <h2>Post-College Recommendations Questions</h2>
-                    <p>Configure interactive questions that appear after college recommendations are shown. These work like regular questions - they can have options, text input, and trigger ChatGPT responses. All questions are optional by default.</p>
+                    <p>Configure interactive questions that appear after college recommendations are shown. These work like regular questions - they can have options, text input, and trigger Claude responses. All questions are optional by default.</p>
                 </div>
 
                 <div id="postCollegeMessagesList"></div>
@@ -226,7 +283,7 @@
                 <!-- Final Message Configuration -->
                 <div class="admin-section" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
                     <h3 style="margin-top: 0; color: #667eea;">Final Message Before Chat Mode</h3>
-                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">This message will appear after all post-college questions are completed, before transitioning to direct ChatGPT chat mode.</p>
+                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">This message will appear after all post-college questions are completed, before transitioning to direct Claude chat mode.</p>
                     <div class="form-group">
                         <label>Final Message Text</label>
                         <textarea id="finalMessageText" rows="3" placeholder="Enter a final message to display before chat mode..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
@@ -283,7 +340,13 @@
             const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
 
             div.innerHTML = `
+                <div class="reorder-handle" draggable="true" title="Drag to reorder">⋮⋮ Drag to reorder</div>
                 <h3>Question ${index + 1}</h3>
+                <div class="position-row">
+                    <label for="position-${index}">Position:</label>
+                    <input type="number" class="position-input" id="position-${index}" min="1" max="${questions.length}" value="${index + 1}" title="Type a number 1–${questions.length} and press Enter to move this question">
+                    <span class="position-hint">(1–${questions.length}. Press Enter to apply)</span>
+                </div>
                 <div class="form-group">
                     <label>Question Text</label>
                     <input type="text" class="question-text" value="${escapeHtml(question.text)}" placeholder="Enter question text">
@@ -312,9 +375,14 @@
                     <textarea class="question-text-bubbles" placeholder="Enter each message on a new line...&#10;Message 1&#10;Message 2&#10;Message 3" rows="4">${question.textBubbles ? question.textBubbles.join('\n') : ''}</textarea>
                 </div>
                 <div class="form-group">
-                    <label>ChatGPT Prompt (Optional)</label>
-                    <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for ChatGPT when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip ChatGPT response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
-                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to ChatGPT after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                    <label>Claude Prompt (Optional)</label>
+                    <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for Claude when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip Claude response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to Claude after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                </div>
+                <div class="form-group" style="background: #f0f4ff; padding: 16px; border-radius: 8px; border: 1px solid #667eea;">
+                    <label style="font-weight: 600; color: #667eea;">Text After Claude Response (Your custom text)</label>
+                    <textarea class="question-text-after-claude" placeholder="Add your own text that appears after the Claude output. E.g. instructions, prompts, or follow-up content. Leave empty for none." rows="4" style="margin-top: 8px; width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">${escapeHtml(question.textAfterClaude || '')}</textarea>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 8px;">This text is shown immediately after the Claude response. You (the admin) add it here.</p>
                 </div>
                 <div class="form-group">
                     <label>Use Only Specific Question Answer (Optional)</label>
@@ -329,7 +397,7 @@
                     <div class="form-group" id="ragQueryGroup-${index}" style="margin-top: 10px; ${question.useRAG ? '' : 'display: none;'}">
                         <label>RAG Search Query</label>
                         <input type="text" class="question-rag-query" placeholder="What to search for in documents (e.g., 'colleges for 11th graders', 'STEM programs')" value="${escapeHtml(question.ragQuery || '')}">
-                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Enter what to search for in your uploaded documents. You can use <strong>{answer}</strong> to include the user's answer. The search results will be available as <strong>{ragResults}</strong> in your ChatGPT prompt.</p>
+                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Enter what to search for in your uploaded documents. You can use <strong>{answer}</strong> to include the user's answer. The search results will be available as <strong>{ragResults}</strong> in your Claude prompt.</p>
                     </div>
                 </div>
                 <div class="form-group">
@@ -363,8 +431,10 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn-danger" onclick="deleteQuestion(${index})">Delete Question</button>
+                    ${index > 0 ? `<button class="btn-secondary" onclick="moveQuestionToTop(${index})">Move to top</button>` : ''}
                     ${index > 0 ? `<button class="btn-secondary" onclick="moveQuestion(${index}, -1)">Move Up</button>` : ''}
                     ${index < questions.length - 1 ? `<button class="btn-secondary" onclick="moveQuestion(${index}, 1)">Move Down</button>` : ''}
+                    ${index < questions.length - 1 ? `<button class="btn-secondary" onclick="moveQuestionToBottom(${index})">Move to bottom</button>` : ''}
                 </div>
             `;
 
@@ -376,6 +446,40 @@
                     tag.className = 'option-tag';
                     tag.innerHTML = `${escapeHtml(option)} <span class="remove" onclick="removeOption(${index}, ${optIndex})">×</span>`;
                     optionsList.appendChild(tag);
+                });
+            }
+
+            // Position input: type a number and press Enter to move
+            const positionInput = div.querySelector('.position-input');
+            if (positionInput) {
+                const applyPosition = () => {
+                    const val = parseInt(positionInput.value, 10);
+                    if (isNaN(val)) return;
+                    const newPos = Math.max(1, Math.min(questions.length, val));
+                    if (newPos === index + 1) return;
+                    moveQuestionToPosition(index, newPos);
+                };
+                positionInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyPosition();
+                    }
+                });
+                positionInput.addEventListener('change', applyPosition);
+            }
+
+            // Drag handle: reorder by dragging
+            const handle = div.querySelector('.reorder-handle');
+            if (handle) {
+                handle.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', String(index));
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setDragImage(div, 0, 0);
+                    div.classList.add('question-editor-dragging');
+                });
+                handle.addEventListener('dragend', () => {
+                    div.classList.remove('question-editor-dragging');
+                    document.querySelectorAll('.question-editor.reorder-drop-target').forEach(el => el.classList.remove('reorder-drop-target'));
                 });
             }
 
@@ -391,6 +495,13 @@
             div.querySelector('.question-chat-prompt').addEventListener('input', (e) => {
                 questions[index].chatPrompt = e.target.value;
             });
+
+            const textAfterClaudeEl = div.querySelector('.question-text-after-claude');
+            if (textAfterClaudeEl) {
+                textAfterClaudeEl.addEventListener('input', (e) => {
+                    questions[index].textAfterClaude = e.target.value;
+                });
+            }
             
             // Handle specific answer question ID
             const specificAnswerInput = div.querySelector('.question-specific-answer-id');
@@ -565,30 +676,84 @@
             }
         }
 
-        // Move question
+        // Move question one step up or down
         function moveQuestion(index, direction) {
             const newIndex = index + direction;
             if (newIndex >= 0 && newIndex < questions.length) {
-                // Swap questions
                 [questions[index], questions[newIndex]] = [questions[newIndex], questions[index]];
-                
-                // Re-render to show new order
                 renderQuestions();
-                
-                // Scroll to the moved question
-                setTimeout(() => {
-                    const movedQuestion = document.querySelector(`[data-index="${newIndex}"]`);
-                    if (movedQuestion) {
-                        movedQuestion.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        // Highlight the moved question briefly
-                        movedQuestion.style.transition = 'box-shadow 0.3s';
-                        movedQuestion.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.5)';
-                        setTimeout(() => {
-                            movedQuestion.style.boxShadow = '';
-                        }, 1000);
-                    }
-                }, 100);
+                scrollToQuestion(newIndex);
             }
+        }
+
+        // Move question to top
+        function moveQuestionToTop(index) {
+            if (index <= 0) return;
+            const [q] = questions.splice(index, 1);
+            questions.unshift(q);
+            renderQuestions();
+            scrollToQuestion(0);
+        }
+
+        // Move question to bottom
+        function moveQuestionToBottom(index) {
+            if (index >= questions.length - 1) return;
+            const [q] = questions.splice(index, 1);
+            questions.push(q);
+            renderQuestions();
+            scrollToQuestion(questions.length - 1);
+        }
+
+        // Move question to a specific position (1-based). Type in the Position field and press Enter.
+        function moveQuestionToPosition(fromIndex, newPosition1Based) {
+            const toIndex = Math.max(0, Math.min(questions.length - 1, newPosition1Based - 1));
+            if (fromIndex === toIndex) return;
+            const [item] = questions.splice(fromIndex, 1);
+            questions.splice(toIndex, 0, item);
+            renderQuestions();
+            scrollToQuestion(toIndex);
+        }
+
+        function scrollToQuestion(index) {
+            setTimeout(() => {
+                const el = document.querySelector(`.question-editor[data-index="${index}"]`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('reorder-drop-target');
+                    setTimeout(() => el.classList.remove('reorder-drop-target'), 1200);
+                }
+            }, 100);
+        }
+
+        // Setup drag-and-drop on the questions list (call once)
+        function setupQuestionsListDragDrop() {
+            const list = document.getElementById('questionsList');
+            if (!list) return;
+            list.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const target = e.target.closest('.question-editor');
+                document.querySelectorAll('.question-editor.reorder-drop-target').forEach(el => el.classList.remove('reorder-drop-target'));
+                if (target) target.classList.add('reorder-drop-target');
+            });
+            list.addEventListener('dragleave', (e) => {
+                if (!list.contains(e.relatedTarget)) {
+                    document.querySelectorAll('.question-editor.reorder-drop-target').forEach(el => el.classList.remove('reorder-drop-target'));
+                }
+            });
+            list.addEventListener('drop', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.question-editor.reorder-drop-target').forEach(el => el.classList.remove('reorder-drop-target'));
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                const target = e.target.closest('.question-editor');
+                if (!target) return;
+                const toIndex = parseInt(target.dataset.index, 10);
+                if (fromIndex === toIndex) return;
+                const [item] = questions.splice(fromIndex, 1);
+                const insertIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
+                questions.splice(insertIndex, 0, item);
+                renderQuestions();
+            });
         }
 
         // Save all questions
@@ -723,6 +888,10 @@
 
             div.innerHTML = `
                 <h3>Post-College Question ${index + 1}</h3>
+                <div style="font-size: 0.85em; color: #666; margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                    <strong>Question ID:</strong> <code style="background: white; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${question.id || 'post-college-' + index}</code>
+                    <span style="color: #999; margin-left: 10px;">(Use this in Claude prompts with {q:${question.id || 'post-college-' + index}})</span>
+                </div>
                 <div class="form-group">
                     <label>Question Text</label>
                     <input type="text" class="question-text" value="${escapeHtml(question.text || '')}" placeholder="Enter question text">
@@ -758,9 +927,21 @@
                     <textarea class="question-text-bubbles" placeholder="Enter each message on a new line...&#10;Message 1&#10;Message 2&#10;Message 3" rows="4">${question.textBubbles ? question.textBubbles.join('\n') : ''}</textarea>
                 </div>
                 <div class="form-group">
-                    <label>ChatGPT Prompt (Optional)</label>
-                    <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for ChatGPT when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip ChatGPT response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
-                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to ChatGPT after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                    <label>Claude Prompt (Optional)</label>
+                    <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for Claude when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip Claude response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to Claude after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                </div>
+                <div class="form-group" style="background: #f0f4ff; padding: 16px; border-radius: 8px; border: 1px solid #667eea;">
+                    <label style="font-weight: 600; color: #667eea;">Text After Claude Response (Your custom text)</label>
+                    <textarea class="question-text-after-claude" placeholder="Add your own text that appears after the Claude output. E.g. instructions, prompts, or follow-up content. Leave empty for none." rows="4" style="margin-top: 8px; width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">${escapeHtml(question.textAfterClaude || '')}</textarea>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 8px;">This text is shown immediately after the Claude response. You (the admin) add it here.</p>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" class="question-college-details-flow" ${question.collegeDetailsFlow ? 'checked' : ''} id="post-college-collegeDetailsFlow-${index}">
+                        <label for="post-college-collegeDetailsFlow-${index}" style="font-weight: 600;">Use college list + details flow (multi-step Claude: list colleges, then get details for each)</label>
+                    </div>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">When enabled, Claude will first get a list of colleges, then fetch details for each, and format the combined output. The Claude Prompt above is used as the custom list prompt (with {allAnswers}); leave empty for default.</p>
                 </div>
                 <div class="form-group">
                     <label>Use Only Specific Question Answer (Optional)</label>
@@ -775,8 +956,29 @@
                     <div class="form-group" id="post-college-ragQueryGroup-${index}" style="margin-top: 10px; ${question.useRAG ? '' : 'display: none;'}">
                         <label>RAG Search Query</label>
                         <input type="text" class="question-rag-query" placeholder="What to search for in documents (e.g., 'colleges for 11th graders', 'STEM programs')" value="${escapeHtml(question.ragQuery || '')}">
-                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Enter what to search for in your uploaded documents. You can use <strong>{answer}</strong> to include the user's answer. The search results will be available as <strong>{ragResults}</strong> in your ChatGPT prompt.</p>
+                        <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Enter what to search for in your uploaded documents. You can use <strong>{answer}</strong> to include the user's answer. The search results will be available as <strong>{ragResults}</strong> in your Claude prompt.</p>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Conditional Question (Optional)</label>
+                    <p style="color: #666; font-size: 0.85em; margin-bottom: 10px;">Show this question only if a previous answer (from regular or post-college questions) meets certain conditions.</p>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <select class="post-college-condition-question-id" style="flex: 1; min-width: 150px;">
+                            <option value="">No condition (always show)</option>
+                        </select>
+                        <select class="post-college-condition-operator" style="width: 120px;" ${!question.condition ? 'disabled' : ''}>
+                            <option value="equals" ${question.condition?.operator === 'equals' ? 'selected' : ''}>equals</option>
+                            <option value="notEquals" ${question.condition?.operator === 'notEquals' ? 'selected' : ''}>not equals</option>
+                            <option value="contains" ${question.condition?.operator === 'contains' ? 'selected' : ''}>contains</option>
+                            <option value="notContains" ${question.condition?.operator === 'notContains' ? 'selected' : ''}>not contains</option>
+                            <option value="greaterThan" ${question.condition?.operator === 'greaterThan' ? 'selected' : ''}>greater than</option>
+                            <option value="lessThan" ${question.condition?.operator === 'lessThan' ? 'selected' : ''}>less than</option>
+                        </select>
+                        <input type="text" class="post-college-condition-value" placeholder="Value" value="${question.condition?.value || ''}" style="flex: 1; min-width: 100px;" ${!question.condition ? 'disabled' : ''}>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="togglePostCollegeCondition(${index})" style="margin-top: 10px;">
+                        ${question.condition ? 'Remove Condition' : 'Add Condition'}
+                    </button>
                 </div>
                 <div class="form-group options-container" style="display: ${needsOptions ? 'block' : 'none'}">
                     <label>Options</label>
@@ -793,6 +995,46 @@
                 </div>
             `;
             
+            // Populate condition question dropdown with both regular and post-college questions
+            const conditionSelect = div.querySelector('.post-college-condition-question-id');
+            if (conditionSelect) {
+                // Add regular questions
+                if (questions && questions.length > 0) {
+                    const regularGroup = document.createElement('optgroup');
+                    regularGroup.label = 'Regular Questions';
+                    questions.forEach((q, qIndex) => {
+                        const option = document.createElement('option');
+                        option.value = q.id;
+                        option.textContent = `Q${qIndex + 1}: ${q.text ? q.text.substring(0, 50) : q.id}${q.text && q.text.length > 50 ? '...' : ''}`;
+                        if (question.condition && question.condition.questionId === q.id) {
+                            option.selected = true;
+                        }
+                        regularGroup.appendChild(option);
+                    });
+                    conditionSelect.appendChild(regularGroup);
+                }
+                
+                // Add post-college questions (excluding current question)
+                if (postCollegeQuestions && postCollegeQuestions.length > 0) {
+                    const postCollegeGroup = document.createElement('optgroup');
+                    postCollegeGroup.label = 'Post-College Questions';
+                    postCollegeQuestions.forEach((q, qIndex) => {
+                        if (q.id !== question.id) { // Don't include current question
+                            const option = document.createElement('option');
+                            option.value = q.id;
+                            option.textContent = `PC Q${qIndex + 1}: ${q.text ? q.text.substring(0, 50) : q.id}${q.text && q.text.length > 50 ? '...' : ''}`;
+                            if (question.condition && question.condition.questionId === q.id) {
+                                option.selected = true;
+                            }
+                            postCollegeGroup.appendChild(option);
+                        }
+                    });
+                    if (postCollegeGroup.children.length > 0) {
+                        conditionSelect.appendChild(postCollegeGroup);
+                    }
+                }
+            }
+            
             // Populate options if they exist
             if (needsOptions && question.options && question.options.length > 0) {
                 const optionsList = div.querySelector(`#post-college-options-${index}`);
@@ -807,7 +1049,77 @@
                 });
             }
             
+            // Add event listeners for condition fields
+            const conditionQuestionSelect = div.querySelector('.post-college-condition-question-id');
+            const conditionOperatorSelect = div.querySelector('.post-college-condition-operator');
+            const conditionValueInput = div.querySelector('.post-college-condition-value');
+            
+            if (conditionQuestionSelect) {
+                conditionQuestionSelect.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        if (!postCollegeQuestions[index].condition) {
+                            postCollegeQuestions[index].condition = { questionId: '', operator: 'equals', value: '' };
+                        }
+                        postCollegeQuestions[index].condition.questionId = e.target.value;
+                        conditionOperatorSelect.disabled = false;
+                        conditionValueInput.disabled = false;
+                    } else {
+                        postCollegeQuestions[index].condition = null;
+                        conditionOperatorSelect.disabled = true;
+                        conditionValueInput.disabled = true;
+                    }
+                });
+            }
+            
+            if (conditionOperatorSelect) {
+                conditionOperatorSelect.addEventListener('change', (e) => {
+                    if (postCollegeQuestions[index].condition) {
+                        postCollegeQuestions[index].condition.operator = e.target.value;
+                    }
+                });
+            }
+            
+            if (conditionValueInput) {
+                conditionValueInput.addEventListener('input', (e) => {
+                    if (postCollegeQuestions[index].condition) {
+                        postCollegeQuestions[index].condition.value = e.target.value;
+                    }
+                });
+            }
+            
             return div;
+        }
+        
+        // Toggle condition for post-college question
+        function togglePostCollegeCondition(index) {
+            const question = postCollegeQuestions[index];
+            const editor = document.querySelector(`.question-editor[data-index="${index}"]`);
+            if (!editor) return;
+            
+            const conditionQuestionSelect = editor.querySelector('.post-college-condition-question-id');
+            const conditionOperatorSelect = editor.querySelector('.post-college-condition-operator');
+            const conditionValueInput = editor.querySelector('.post-college-condition-value');
+            
+            if (!question.condition) {
+                // Add condition
+                question.condition = { questionId: '', operator: 'equals', value: '' };
+                conditionOperatorSelect.disabled = false;
+                conditionValueInput.disabled = false;
+            } else {
+                // Remove condition
+                question.condition = null;
+                conditionQuestionSelect.value = '';
+                conditionOperatorSelect.value = 'equals';
+                conditionOperatorSelect.disabled = true;
+                conditionValueInput.value = '';
+                conditionValueInput.disabled = true;
+            }
+            
+            // Update button text
+            const button = editor.querySelector(`button[onclick="togglePostCollegeCondition(${index})"]`);
+            if (button) {
+                button.textContent = question.condition ? 'Remove Condition' : 'Add Condition';
+            }
         }
 
         // Update post-college question type
@@ -938,15 +1250,30 @@
                 const questionRequired = editor.querySelector('.question-required');
                 const questionNoInput = editor.querySelector('.question-no-input');
                 const questionChatPrompt = editor.querySelector('.question-chat-prompt');
+                const questionTextAfterClaude = editor.querySelector('.question-text-after-claude');
+                const questionCollegeDetailsFlow = editor.querySelector('.question-college-details-flow');
                 const questionUseRAG = editor.querySelector('.question-use-rag');
                 const questionRAGQuery = editor.querySelector('.question-rag-query');
                 const questionSpecificAnswerId = editor.querySelector('.question-specific-answer-id');
+                const conditionQuestionId = editor.querySelector('.post-college-condition-question-id');
+                const conditionOperator = editor.querySelector('.post-college-condition-operator');
+                const conditionValue = editor.querySelector('.post-college-condition-value');
                 
                 if (!questionType) {
                     console.error('Missing question type in editor:', editor);
                     return; // Skip this editor if question type is missing
                 }
                 // Allow empty text for optional questions
+                
+                // Get condition if set
+                let condition = null;
+                if (conditionQuestionId && conditionQuestionId.value) {
+                    condition = {
+                        questionId: conditionQuestionId.value,
+                        operator: conditionOperator ? conditionOperator.value : 'equals',
+                        value: conditionValue ? conditionValue.value.trim() : ''
+                    };
+                }
                 
                 const question = {
                     id: existingQuestion?.id || `post-college-${Date.now()}-${actualIndex}`,
@@ -956,11 +1283,13 @@
                     noInput: questionNoInput ? questionNoInput.checked : false,
                     options: [],
                     chatPrompt: questionChatPrompt ? questionChatPrompt.value.trim() : '',
+                    textAfterClaude: questionTextAfterClaude ? questionTextAfterClaude.value.trim() : '',
+                    collegeDetailsFlow: questionCollegeDetailsFlow ? questionCollegeDetailsFlow.checked : false,
                     specificAnswerQuestionId: questionSpecificAnswerId ? questionSpecificAnswerId.value.trim() : '',
                     useRAG: questionUseRAG ? questionUseRAG.checked : false,
                     ragQuery: questionRAGQuery ? questionRAGQuery.value.trim() : '',
                     textBubbles: null,
-                    condition: null
+                    condition: condition
                 };
                 
                 // Get text bubbles
@@ -1041,6 +1370,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            setupQuestionsListDragDrop();
             loadQuestions();
             loadPostCollegeMessages();
         });

@@ -21,7 +21,7 @@
         }
 
         .payment-header h1 {
-            color: #667eea;
+            color: #000;
             font-size: 2rem;
             margin-bottom: 10px;
         }
@@ -50,7 +50,7 @@
             border-bottom: none;
             font-weight: 700;
             font-size: 1.2rem;
-            color: #667eea;
+            color: #333;
             margin-top: 10px;
             padding-top: 15px;
         }
@@ -83,7 +83,7 @@
         .form-group input:focus,
         .form-group select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #555;
         }
 
         .form-row {
@@ -100,7 +100,7 @@
         }
 
         .btn-primary {
-            background: #667eea;
+            background: #555;
             color: white;
             border: none;
             padding: 15px 40px;
@@ -113,15 +113,15 @@
         }
 
         .btn-primary:hover {
-            background: #5568d3;
+            background: #444;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .btn-secondary {
             background: white;
-            color: #667eea;
-            border: 2px solid #667eea;
+            color: #333;
+            border: 2px solid #555;
             padding: 15px 40px;
             border-radius: 8px;
             font-size: 1.1rem;
@@ -131,7 +131,7 @@
         }
 
         .btn-secondary:hover {
-            background: #f0f4ff;
+            background: #f0f0f0;
         }
 
         .loading {
@@ -148,10 +148,10 @@
             display: none;
             text-align: center;
             padding: 30px;
-            background: #d4edda;
-            border: 2px solid #c3e6cb;
+            background: #f0f0f0;
+            border: 2px solid #e0e0e0;
             border-radius: 8px;
-            color: #155724;
+            color: #333;
             margin-top: 20px;
         }
 
@@ -159,60 +159,14 @@
             display: block;
         }
 
-        .nav-header {
-            background: white;
-            padding: 15px 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .nav-header .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #667eea;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .nav-links a, .nav-links button {
-            color: #333;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.3s;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: inherit;
-            font-family: inherit;
-        }
-
-        .nav-links a:hover, .nav-links button:hover {
-            background: #f0f4ff;
-            color: #667eea;
-        }
-
-        .nav-links .auth-button {
-            margin-left: auto;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- Navigation Header -->
         <nav class="nav-header">
-            <div class="logo">Pathwise</div>
+            <a href="/" class="logo">Pathwise</a>
             <div class="nav-links">
-                <a href="/">Home</a>
                 <a href="/payment" id="plansLink" style="display: block;">Plans</a>
                 <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
                 <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
@@ -243,32 +197,7 @@
             </div>
 
             <form id="paymentForm" class="payment-form">
-                <div class="form-group">
-                    <label for="cardNumber">Card Number</label>
-                    <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="cardName">Cardholder Name</label>
-                    <input type="text" id="cardName" placeholder="John Doe" required>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="expiryDate">Expiry Date</label>
-                        <input type="text" id="expiryDate" placeholder="MM/YY" maxlength="5" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="cvv">CVV</label>
-                        <input type="text" id="cvv" placeholder="123" maxlength="4" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="billingEmail">Billing Email</label>
-                    <input type="email" id="billingEmail" placeholder="your.email@example.com" required>
-                </div>
-
+                <p style="color: #333; margin-bottom: 20px;">Click below to pay securely with Stripe. If Stripe is not configured, your account will be marked as paid for testing.</p>
                 <div class="loading" id="loading">
                     <p>Processing payment...</p>
                 </div>
@@ -305,27 +234,6 @@
         document.getElementById('planPrice').textContent = `$${selectedPrice}.00`;
         document.getElementById('totalPrice').textContent = `$${selectedPrice}.00`;
 
-        // Format card number input
-        document.getElementById('cardNumber').addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\s/g, '');
-            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
-            e.target.value = formattedValue;
-        });
-
-        // Format expiry date input
-        document.getElementById('expiryDate').addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + '/' + value.substring(2, 4);
-            }
-            e.target.value = value;
-        });
-
-        // Format CVV (numbers only)
-        document.getElementById('cvv').addEventListener('input', (e) => {
-            e.target.value = e.target.value.replace(/\D/g, '');
-        });
-
         // Check if user is logged in before allowing payment
         async function checkAuthBeforePayment() {
             try {
@@ -341,11 +249,10 @@
             }
         }
 
-        // Handle form submission
+        // Handle form submission: try Stripe Checkout first; fall back to “mark as paid” if Stripe not configured
         document.getElementById('paymentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Check if user is logged in
             const isAuthenticated = await checkAuthBeforePayment();
             if (!isAuthenticated) {
                 alert('Please log in to complete payment');
@@ -358,125 +265,73 @@
             const successMessage = document.getElementById('successMessage');
             const paymentActions = document.getElementById('paymentActions');
 
-            // Hide form, show loading
             form.style.display = 'none';
             paymentActions.style.display = 'none';
             loading.classList.add('show');
 
-            // Simulate payment processing (in real app, this would call a payment API)
-            setTimeout(async () => {
-                // Double-check authentication before payment
-                const isStillAuthenticated = await checkAuthBeforePayment();
-                if (!isStillAuthenticated) {
+            try {
+                const sessionRes = await fetch('/api/payment/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ plan: selectedPlan, price: selectedPrice })
+                });
+                const sessionData = await sessionRes.json().catch(() => ({}));
+
+                if (sessionRes.ok && sessionData.url) {
+                    window.location.href = sessionData.url;
+                    return;
+                }
+            } catch (err) {
+                console.error('Create checkout session error:', err);
+            }
+
+            // Stripe not configured or failed – fall back to “mark as paid” (no real charge)
+            const isStillAuthenticated = await checkAuthBeforePayment();
+            if (!isStillAuthenticated) {
+                loading.classList.remove('show');
+                alert('Session expired. Please log in again.');
+                window.location.href = '/login.html';
+                return;
+            }
+
+            let paymentRecorded = false;
+            try {
+                const paymentResponse = await fetch('/api/payment/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ plan: selectedPlan, price: selectedPrice })
+                });
+                if (paymentResponse.ok) {
+                    const paymentData = await paymentResponse.json();
+                    if (paymentData.success) {
+                        paymentRecorded = true;
+                        localStorage.setItem('paymentCompleted', 'true');
+                        localStorage.setItem('paymentPlan', selectedPlan);
+                        localStorage.setItem('paymentDate', paymentData.paymentDate || new Date().toISOString());
+                    }
+                } else if (paymentResponse.status === 401) {
                     loading.classList.remove('show');
-                    alert('Session expired. Please log in again.');
+                    alert('Session expired. Please log in again to complete payment');
                     window.location.href = '/login.html';
                     return;
                 }
+            } catch (error) {
+                console.error('Error recording payment:', error);
+            }
 
-                // Try to record payment on server first (account-based)
-                let paymentRecorded = false;
-                try {
-                    console.log('Attempting to record payment:', { plan: selectedPlan, price: selectedPrice });
-                    
-                    // Make sure we have a valid session by checking auth first
-                    const authCheck = await fetch('/api/auth/check', {
-                        credentials: 'include'
-                    });
-                    const authData = await authCheck.json();
-                    console.log('Auth status before payment:', authData);
-                    
-                    if (!authData.authenticated) {
-                        throw new Error('Not authenticated');
-                    }
-                    
-                    const paymentResponse = await fetch('/api/payment/complete', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        credentials: 'include', // Critical: must include cookies for session
-                        body: JSON.stringify({
-                            plan: selectedPlan,
-                            price: selectedPrice
-                        })
-                    });
-                    
-                    console.log('Payment response:', {
-                        status: paymentResponse.status,
-                        statusText: paymentResponse.statusText,
-                        ok: paymentResponse.ok
-                    });
-                    
-                    if (paymentResponse.ok) {
-                        const paymentData = await paymentResponse.json();
-                        if (paymentData.success) {
-                            paymentRecorded = true;
-                            console.log('Payment recorded on server successfully');
-                            // Sync to localStorage after server confirms
-                            localStorage.setItem('paymentCompleted', 'true');
-                            localStorage.setItem('paymentPlan', selectedPlan);
-                            localStorage.setItem('paymentDate', paymentData.paymentDate || new Date().toISOString());
-                        } else {
-                            console.error('Payment recording failed:', paymentData.message);
-                        }
-                    } else {
-                        // Get error message from response
-                        let errorMessage = 'Failed to record payment on server';
-                        let errorData = null;
-                        try {
-                            errorData = await paymentResponse.json();
-                            errorMessage = errorData.message || errorMessage;
-                        } catch (e) {
-                            errorMessage = `Server error: ${paymentResponse.status} ${paymentResponse.statusText}`;
-                        }
-                        console.error('Payment failed:', {
-                            status: paymentResponse.status,
-                            statusText: paymentResponse.statusText,
-                            message: errorMessage,
-                            data: errorData
-                        });
-                        
-                        if (paymentResponse.status === 401) {
-                            // User not logged in - redirect to login
-                            loading.classList.remove('show');
-                            alert('Session expired. Please log in again to complete payment');
-                            window.location.href = '/login.html';
-                            return;
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error recording payment:', error);
-                }
-                
-                // Only proceed if payment was recorded on server (account-based)
-                if (!paymentRecorded) {
-                    loading.classList.remove('show');
-                    
-                    // Check auth status one more time to give helpful message
-                    const finalAuthCheck = await checkAuthBeforePayment();
-                    if (!finalAuthCheck) {
-                        alert('Your session has expired. Please log in again and try the payment.');
-                        window.location.href = '/login.html';
-                    } else {
-                        alert('Payment could not be recorded. Please try again or contact support if the issue persists.');
-                        form.style.display = 'block';
-                        paymentActions.style.display = 'flex';
-                    }
-                    return;
-                }
-                
-                // Payment recorded successfully - show success
-                loading.classList.remove('show');
-                successMessage.classList.add('show');
-                
-                // Clear session storage
-                sessionStorage.removeItem('selectedPlan');
-                sessionStorage.removeItem('selectedPrice');
-                
-                // Update navigation immediately to show Counselor and hide Plans
-                await updateNavigation();
-            }, 2000);
+            loading.classList.remove('show');
+            if (!paymentRecorded) {
+                alert('Payment could not be recorded. Please try again or contact support.');
+                form.style.display = 'block';
+                paymentActions.style.display = 'flex';
+                return;
+            }
+            successMessage.classList.add('show');
+            sessionStorage.removeItem('selectedPlan');
+            sessionStorage.removeItem('selectedPrice');
+            await updateNavigation();
         });
 
         // Check payment status (server-based, account-specific)

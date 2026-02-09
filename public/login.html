@@ -6,62 +6,14 @@
     <title>Pathwise - Login</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        .nav-header {
-            background: white;
-            padding: 15px 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .nav-header .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #667eea;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-        
-        .nav-links a, .nav-links button {
-            color: #333;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.3s;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: inherit;
-            font-family: inherit;
-        }
-        
-        .nav-links a:hover, .nav-links button:hover {
-            background: #f0f4ff;
-            color: #667eea;
-        }
-        
-        .nav-links .auth-button {
-            margin-left: auto;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- Navigation Header -->
         <nav class="nav-header">
-            <div class="logo">Pathwise</div>
+            <a href="/" class="logo">Pathwise</a>
             <div class="nav-links">
-                <a href="/">Home</a>
-                <a href="/#about">About</a>
-                <a href="/#pricing">Pricing</a>
                 <a href="/payment" id="plansLink" style="display: block;">Plans</a>
                 <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
                 <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
@@ -71,11 +23,6 @@
         </nav>
         <div class="login-container">
             <div class="login-box">
-                <div class="logo">
-                    <h1>Pathwise</h1>
-                    <p class="tagline">Your journey, your path</p>
-                </div>
-                
                 <div id="loginForm" class="auth-form">
                     <h2>Welcome Back</h2>
                     <p class="subtitle">Sign in to continue</p>

@@ -10,8 +10,19 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
+// Import MongoDB database functions
+const db = require('./db');
+
+// Stripe (optional – only if STRIPE_SECRET_KEY is set)
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Trust proxy (required for cookies/sessions behind Fly.io, Render, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Configure multer for file uploads
 const upload = multer({ 
@@ -33,19 +44,10 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Initialize OpenAI (ChatGPT) - only if API key is provided
-let openai = null;
-if (process.env.OPENAI_API_KEY) {
-  const OpenAI = require('openai');
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-  });
-  console.log('ChatGPT integration enabled');
-} else {
-  console.log('ChatGPT integration disabled - OPENAI_API_KEY not set');
-}
+// Initialize LLM: Claude (Anthropic) or OpenAI - prefers Claude when ANTHROPIC_API_KEY set
+const { hasLLM, chatComplete, chatCompleteWithMessages, openai } = require('./llm');
 
-// Initialize RAG System with persistent storage
+// Initialize RAG System (requires OpenAI for embeddings; chat can use Claude)
 const { VectorStore, DocumentProcessor, RAGQueryHandler } = require('./rag-system');
 const VECTOR_STORE_PATH = path.join(__dirname, 'data', 'vector-store.json');
 const vectorStore = new VectorStore(VECTOR_STORE_PATH);
@@ -54,10 +56,10 @@ let ragQueryHandler = null;
 
 if (openai) {
   documentProcessor = new DocumentProcessor(openai, vectorStore);
-  ragQueryHandler = new RAGQueryHandler(documentProcessor, openai);
-  console.log('RAG system initialized with GPT-3.5-turbo');
+  ragQueryHandler = new RAGQueryHandler(documentProcessor, openai, chatComplete);
+  console.log('RAG system initialized (embeddings: OpenAI, chat: Claude only)');
 } else {
-  console.log('RAG system disabled - OPENAI_API_KEY not set');
+  console.log('RAG system disabled - OPENAI_API_KEY required for embeddings');
 }
 
 // Session configuration
@@ -78,6 +80,11 @@ app.use(cors({
   origin: true,
   credentials: true // Allow cookies
 }));
+// Stripe webhook needs raw body for signature verification – register before bodyParser
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  if (typeof paymentWebhookHandler === 'function') paymentWebhookHandler(req, res);
+  else res.status(500).send('Webhook handler not ready');
+});
 app.use(bodyParser.json());
 // Serve payment page route BEFORE static files
 app.get('/payment', (req, res) => {
@@ -126,8 +133,8 @@ if (!fs.existsSync(PROMPTS_FILE)) {
     "welcome": "Hello! I'm your Pathwise counselor. I've reviewed your previous responses. How can I help you today? Feel free to ask me any questions!",
     "default": "Thank you for your question. I'm here to help guide you on your path forward.",
     "systemPrompt": "You are a helpful counselor assistant for Pathwise. You provide guidance and support based on user questionnaire responses. Be empathetic, clear, and concise. When appropriate, reference the user's previous responses to provide personalized advice.",
-    "useChatGPT": true,
-    "chatGPTWeight": 0.7,
+    "useClaude": true,
+    "claudeWeight": 0.7,
     "presetWeight": 0.3,
     "responses": [
       {
@@ -165,6 +172,30 @@ function readJSONFile(filePath) {
 // Helper function to write JSON file
 function writeJSONFile(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+// Record payment for a user (used by Stripe webhook and verify-session)
+async function recordPaymentForUser(userId, plan) {
+  const paymentDate = new Date().toISOString();
+  const updateData = { hasPayment: true, paymentPlan: plan, paymentDate };
+  let user = await db.getUserById(userId);
+  if (user !== null) {
+    const ok = await db.updateUser(userId, updateData);
+    if (ok) {
+      console.log(`Payment recorded for user ${userId}, plan: ${plan} (MongoDB)`);
+      return true;
+    }
+    return false;
+  }
+  const users = readJSONFile(USERS_FILE);
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx === -1) return false;
+  users[idx].hasPayment = true;
+  users[idx].paymentPlan = plan;
+  users[idx].paymentDate = paymentDate;
+  writeJSONFile(USERS_FILE, users);
+  console.log(`Payment recorded for user ${userId}, plan: ${plan} (JSON)`);
+  return true;
 }
 
 // Password hashing
@@ -231,7 +262,7 @@ function requireAuth(req, res, next) {
 // API Routes
 
 // Authentication Routes
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     console.log('Registration attempt:', { username: req.body.username, hasPassword: !!req.body.password, hasEmail: !!req.body.email });
     const { username, password, email } = req.body;
@@ -257,14 +288,28 @@ app.post('/api/auth/register', (req, res) => {
       });
     }
     
-    const users = readJSONFile(USERS_FILE);
+    // Try MongoDB first, fallback to JSON files
+    let existingUser = null;
+    const mongoUsers = await db.getUsers();
     
-    // Check if username already exists
-    if (users.find(u => u.username === username)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Username already exists' 
-      });
+    if (mongoUsers !== null) {
+      // Using MongoDB
+      existingUser = await db.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Username already exists' 
+        });
+      }
+    } else {
+      // Fallback to JSON files
+      const users = readJSONFile(USERS_FILE);
+      if (users.find(u => u.username === username)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Username already exists' 
+        });
+      }
     }
     
     // Create new user
@@ -279,14 +324,23 @@ app.post('/api/auth/register', (req, res) => {
       createdAt: new Date().toISOString()
     };
     
-    users.push(newUser);
-    writeJSONFile(USERS_FILE, users);
+    // Save to MongoDB or JSON file
+    if (mongoUsers !== null) {
+      // Save to MongoDB
+      await db.createUser(newUser);
+      console.log(`✅ New user registered in MongoDB: ${username}`);
+    } else {
+      // Fallback to JSON files
+      const users = readJSONFile(USERS_FILE);
+      users.push(newUser);
+      writeJSONFile(USERS_FILE, users);
+      console.log(`✅ New user registered in JSON file: ${username}`);
+    }
     
     // Auto-login after registration
     req.session.userId = newUser.id;
     req.session.username = newUser.username;
     
-    console.log(`New user registered: ${username}`);
     console.log('Session after registration:', {
       userId: req.session.userId,
       username: req.session.username,
@@ -318,7 +372,7 @@ app.post('/api/auth/register', (req, res) => {
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -329,8 +383,18 @@ app.post('/api/auth/login', (req, res) => {
       });
     }
     
-    const users = readJSONFile(USERS_FILE);
-    const user = users.find(u => u.username === username);
+    // Try MongoDB first, fallback to JSON files
+    let user = null;
+    const mongoUsers = await db.getUsers();
+    
+    if (mongoUsers !== null) {
+      // Using MongoDB
+      user = await db.getUserByUsername(username);
+    } else {
+      // Fallback to JSON files
+      const users = readJSONFile(USERS_FILE);
+      user = users.find(u => u.username === username);
+    }
     
     if (!user || user.passwordHash !== hashPassword(password)) {
       return res.status(401).json({ 
@@ -399,11 +463,48 @@ app.get('/api/auth/check', (req, res) => {
 });
 
 // Get all questions (requires login)
-app.get('/api/questions', requireLogin, (req, res) => {
+app.get('/api/questions', requireLogin, async (req, res) => {
+  const startTime = Date.now();
   try {
     console.log(`GET /api/questions - Request received from user: ${req.session.userId || 'unknown'}`);
-    const questions = readJSONFile(QUESTIONS_FILE);
-    console.log(`GET /api/questions - Returning ${questions.length} questions`);
+    
+    // Add timeout wrapper for MongoDB operations
+    const getQuestionsWithTimeout = async () => {
+      return new Promise(async (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Database query timed out after 10 seconds'));
+        }, 10000); // 10 second timeout for database operations
+        
+        try {
+          const result = await db.getQuestions();
+          clearTimeout(timeout);
+          resolve(result);
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+    };
+    
+    // Try MongoDB first, fallback to JSON files
+    let questions;
+    try {
+      questions = await getQuestionsWithTimeout();
+      console.log(`GET /api/questions - MongoDB query completed in ${Date.now() - startTime}ms`);
+    } catch (mongoError) {
+      console.warn(`GET /api/questions - MongoDB query failed or timed out: ${mongoError.message}`);
+      questions = null;
+    }
+    
+    if (questions === null) {
+      // Fallback to JSON files
+      questions = readJSONFile(QUESTIONS_FILE);
+      console.log(`GET /api/questions - Using JSON file storage (${questions.length} questions)`);
+    } else {
+      console.log(`GET /api/questions - Using MongoDB (${questions.length} questions)`);
+    }
+    
+    console.log(`GET /api/questions - Returning ${questions.length} questions (total time: ${Date.now() - startTime}ms)`);
     res.json(questions);
   } catch (error) {
     console.error('Error getting questions:', error);
@@ -413,40 +514,70 @@ app.get('/api/questions', requireLogin, (req, res) => {
 });
 
 // Update questions (for admin/configuration - requires login)
-app.post('/api/questions', requireLogin, (req, res) => {
-  const questions = req.body;
-  if (Array.isArray(questions)) {
-    writeJSONFile(QUESTIONS_FILE, questions);
-    res.json({ success: true, message: 'Questions updated successfully' });
-  } else {
-    res.status(400).json({ success: false, message: 'Questions must be an array' });
+app.post('/api/questions', requireLogin, async (req, res) => {
+  try {
+    const questions = req.body;
+    if (!Array.isArray(questions)) {
+      return res.status(400).json({ success: false, message: 'Questions must be an array' });
+    }
+    
+    // Try MongoDB first, fallback to JSON files
+    const mongoResult = await db.saveQuestions(questions);
+    
+    if (mongoResult === null) {
+      // Fallback to JSON files
+      writeJSONFile(QUESTIONS_FILE, questions);
+      console.log(`POST /api/questions - Saved to JSON file (${questions.length} questions)`);
+      res.json({ success: true, message: 'Questions updated successfully (JSON file)' });
+    } else {
+      console.log(`POST /api/questions - Saved to MongoDB (${questions.length} questions)`);
+      res.json({ success: true, message: 'Questions updated successfully (MongoDB)' });
+    }
+  } catch (error) {
+    console.error('Error saving questions:', error);
+    res.status(500).json({ success: false, message: 'Failed to save questions: ' + error.message });
   }
 });
 
 // Post-College Recommendations Messages endpoints
-app.get('/api/post-college-messages', requireLogin, (req, res) => {
+app.get('/api/post-college-messages', requireLogin, async (req, res) => {
   try {
-    const data = readJSONFile(POST_COLLEGE_MESSAGES_FILE);
+    // Try MongoDB first, fallback to JSON files
+    let data = await db.getPostCollegeMessages();
+    
+    if (data === null) {
+      // Fallback to JSON files
+      try {
+        data = readJSONFile(POST_COLLEGE_MESSAGES_FILE);
+      } catch (error) {
+        // If file doesn't exist, return empty array for backward compatibility
+        if (error.code === 'ENOENT') {
+          return res.json([]);
+        } else {
+          console.error('Error reading post-college messages:', error);
+          return res.status(500).json({ success: false, message: 'Failed to load messages' });
+        }
+      }
+    } else {
+      // MongoDB data - remove the type field before returning
+      delete data.type;
+    }
+    
     // Handle both old format (array) and new format (object)
     if (Array.isArray(data)) {
       // Old format - return as is for backward compatibility
       res.json(data);
     } else {
-      // New format - return object with messages and promptMessage
+      // New format - return object with questions and finalMessage
       res.json(data);
     }
   } catch (error) {
-    // If file doesn't exist, return empty array for backward compatibility
-    if (error.code === 'ENOENT') {
-      res.json([]);
-    } else {
-      console.error('Error reading post-college messages:', error);
-      res.status(500).json({ success: false, message: 'Failed to load messages' });
-    }
+    console.error('Error reading post-college messages:', error);
+    res.status(500).json({ success: false, message: 'Failed to load messages' });
   }
 });
 
-app.post('/api/post-college-messages', requireLogin, (req, res) => {
+app.post('/api/post-college-messages', requireLogin, async (req, res) => {
   try {
     const data = req.body;
     console.log('POST /api/post-college-messages - Received data:', JSON.stringify(data, null, 2));
@@ -467,9 +598,19 @@ app.post('/api/post-college-messages', requireLogin, (req, res) => {
       };
       console.log('Saving post-college questions with final message:', validQuestions.length, 'questions');
       console.log('Final message:', dataToSave.finalMessage);
-      writeJSONFile(POST_COLLEGE_MESSAGES_FILE, dataToSave);
-      console.log('File written successfully to:', POST_COLLEGE_MESSAGES_FILE);
-      res.json({ success: true, message: 'Post-college questions updated successfully' });
+      
+      // Try MongoDB first, fallback to JSON files
+      const mongoResult = await db.savePostCollegeMessages(dataToSave);
+      
+      if (mongoResult === null) {
+        // Fallback to JSON files
+        writeJSONFile(POST_COLLEGE_MESSAGES_FILE, dataToSave);
+        console.log('File written successfully to:', POST_COLLEGE_MESSAGES_FILE);
+        res.json({ success: true, message: 'Post-college questions updated successfully (JSON file)' });
+      } else {
+        console.log('✅ Post-college questions saved to MongoDB');
+        res.json({ success: true, message: 'Post-college questions updated successfully (MongoDB)' });
+      }
     } else if (Array.isArray(data)) {
       // Check if it's old format (has delay property) or new format (has type property)
       // More reliable check: new format has 'type', old format has 'delay' but no 'type'
@@ -507,16 +648,19 @@ app.post('/api/post-college-messages', requireLogin, (req, res) => {
             questions: validQuestions,
             finalMessage: ''
           };
-          writeJSONFile(POST_COLLEGE_MESSAGES_FILE, dataToSave);
-          console.log('File written successfully to:', POST_COLLEGE_MESSAGES_FILE);
           
-          // Verify the file was written
-          if (fs.existsSync(POST_COLLEGE_MESSAGES_FILE)) {
-            const written = JSON.parse(fs.readFileSync(POST_COLLEGE_MESSAGES_FILE, 'utf8'));
-            console.log('Verified file contents:', Array.isArray(written) ? written.length : written.questions?.length, 'questions');
+          // Try MongoDB first, fallback to JSON files
+          const mongoResult = await db.savePostCollegeMessages(dataToSave);
+          
+          if (mongoResult === null) {
+            // Fallback to JSON files
+            writeJSONFile(POST_COLLEGE_MESSAGES_FILE, dataToSave);
+            console.log('File written successfully to:', POST_COLLEGE_MESSAGES_FILE);
+            res.json({ success: true, message: 'Post-college questions updated successfully (JSON file)' });
+          } else {
+            console.log('✅ Post-college questions saved to MongoDB');
+            res.json({ success: true, message: 'Post-college questions updated successfully (MongoDB)' });
           }
-          
-          res.json({ success: true, message: 'Post-college questions updated successfully' });
         } else {
           console.error('No valid questions to save after filtering');
           res.status(400).json({ success: false, message: 'No valid questions to save' });
@@ -527,8 +671,17 @@ app.post('/api/post-college-messages', requireLogin, (req, res) => {
           msg && typeof msg.text === 'string' && typeof msg.delay === 'number'
         );
         console.log('Saving old format messages:', validMessages.length);
-        writeJSONFile(POST_COLLEGE_MESSAGES_FILE, validMessages);
-        res.json({ success: true, message: 'Post-college messages updated successfully' });
+        
+        // Try MongoDB first, fallback to JSON files
+        const dataToSave = { questions: [], finalMessage: '' }; // Convert old format to new format
+        const mongoResult = await db.savePostCollegeMessages(dataToSave);
+        
+        if (mongoResult === null) {
+          writeJSONFile(POST_COLLEGE_MESSAGES_FILE, validMessages);
+          res.json({ success: true, message: 'Post-college messages updated successfully (JSON file)' });
+        } else {
+          res.json({ success: true, message: 'Post-college messages updated successfully (MongoDB)' });
+        }
       } else {
         // Unknown format or empty array
         console.error('Unknown format or empty data:', data);
@@ -540,11 +693,19 @@ app.post('/api/post-college-messages', requireLogin, (req, res) => {
         msg && typeof msg.text === 'string' && typeof msg.delay === 'number'
       );
       const dataToSave = {
-        messages: validMessages,
-        promptMessage: data.promptMessage || "Is there anything else you'd like to ask or discuss? Feel free to share your thoughts or questions!"
+        questions: [],
+        finalMessage: data.promptMessage || "Is there anything else you'd like to ask or discuss? Feel free to share your thoughts or questions!"
       };
-      writeJSONFile(POST_COLLEGE_MESSAGES_FILE, dataToSave);
-      res.json({ success: true, message: 'Post-college messages updated successfully' });
+      
+      // Try MongoDB first, fallback to JSON files
+      const mongoResult = await db.savePostCollegeMessages(dataToSave);
+      
+      if (mongoResult === null) {
+        writeJSONFile(POST_COLLEGE_MESSAGES_FILE, dataToSave);
+        res.json({ success: true, message: 'Post-college messages updated successfully (JSON file)' });
+      } else {
+        res.json({ success: true, message: 'Post-college messages updated successfully (MongoDB)' });
+      }
     } else {
       // Log detailed information about what we received
       console.error('Invalid format - Data received:', JSON.stringify(data, null, 2));
@@ -561,11 +722,10 @@ app.post('/api/post-college-messages', requireLogin, (req, res) => {
 });
 
 // Submit responses (requires login)
-app.post('/api/responses', requireLogin, (req, res) => {
+app.post('/api/responses', requireLogin, async (req, res) => {
   try {
     console.log('POST /api/responses - User:', req.session.userId, req.session.username);
     const response = req.body;
-    const responses = readJSONFile(RESPONSES_FILE);
     
     // Add user info and timestamp (ensure userId is always set)
     response.userId = req.session.userId;
@@ -575,10 +735,19 @@ app.post('/api/responses', requireLogin, (req, res) => {
     
     console.log('Saving response with userId:', response.userId);
     
-    responses.push(response);
-    writeJSONFile(RESPONSES_FILE, responses);
+    // Try MongoDB first, fallback to JSON files
+    const mongoResult = await db.saveResponse(response);
     
-    console.log(`Response submitted by user: ${req.session.username} (ID: ${response.id})`);
+    if (mongoResult === null) {
+      // Fallback to JSON files
+      const responses = readJSONFile(RESPONSES_FILE);
+      responses.push(response);
+      writeJSONFile(RESPONSES_FILE, responses);
+      console.log(`Response submitted by user: ${req.session.username} (ID: ${response.id}) - Saved to JSON file`);
+    } else {
+      console.log(`Response submitted by user: ${req.session.username} (ID: ${response.id}) - Saved to MongoDB`);
+    }
+    
     res.json({ 
       success: true, 
       message: 'Response saved successfully', 
@@ -595,29 +764,45 @@ app.post('/api/responses', requireLogin, (req, res) => {
 });
 
 // Get user's own responses (requires login)
-app.get('/api/my-responses', requireLogin, (req, res) => {
+app.get('/api/my-responses', requireLogin, async (req, res) => {
   try {
     console.log('GET /api/my-responses - User:', req.session.userId, req.session.username);
-    const responses = readJSONFile(RESPONSES_FILE);
-    console.log('Total responses in file:', responses.length);
     
-    // Filter to only show responses from the logged-in user
-    // Only include responses that have userId matching the current user
-    const userResponses = responses.filter(r => {
-      // Skip responses without userId (old responses before account system)
-      if (!r.userId) {
-        console.log('Response has no userId, skipping:', r.id);
-        return false;
-      }
-      const matches = r.userId === req.session.userId;
-      if (!matches) {
-        console.log('Response filtered out - userId mismatch:', r.userId, 'vs', req.session.userId);
-      }
-      return matches;
-    });
+    // Try MongoDB first, fallback to JSON files
+    let userResponse = await db.getResponseByUserId(req.session.userId);
+    let allResponses = null;
     
-    console.log(`GET /api/my-responses - Returning ${userResponses.length} responses for user: ${req.session.username}`);
-    res.json(userResponses);
+    if (userResponse === null) {
+      // Fallback to JSON files
+      allResponses = readJSONFile(RESPONSES_FILE);
+      console.log('Total responses in file:', allResponses.length);
+      
+      // Filter to only show responses from the logged-in user
+      const userResponses = allResponses.filter(r => {
+        // Skip responses without userId (old responses before account system)
+        if (!r.userId) {
+          console.log('Response has no userId, skipping:', r.id);
+          return false;
+        }
+        const matches = r.userId === req.session.userId;
+        if (!matches) {
+          console.log('Response filtered out - userId mismatch:', r.userId, 'vs', req.session.userId);
+        }
+        return matches;
+      });
+      
+      console.log(`GET /api/my-responses - Returning ${userResponses.length} responses for user: ${req.session.username} (from JSON file)`);
+      res.json(userResponses);
+    } else {
+      // Using MongoDB - return the user's response
+      if (userResponse) {
+        console.log(`GET /api/my-responses - Returning response for user: ${req.session.username} (from MongoDB)`);
+        res.json([userResponse]); // Return as array for consistency
+      } else {
+        console.log(`GET /api/my-responses - No response found for user: ${req.session.username}`);
+        res.json([]);
+      }
+    }
   } catch (error) {
     console.error('Error getting user responses:', error);
     res.status(500).json({ 
@@ -629,92 +814,133 @@ app.get('/api/my-responses', requireLogin, (req, res) => {
 });
 
 // Update a specific response (requires login, and must be user's own response)
-app.put('/api/responses/:id', requireLogin, (req, res) => {
+app.put('/api/responses/:id', requireLogin, async (req, res) => {
   try {
     const responseId = req.params.id;
     const updatedData = req.body;
-    const responses = readJSONFile(RESPONSES_FILE);
     
-    const responseIndex = responses.findIndex(r => r.id === responseId);
+    // Try MongoDB first, fallback to JSON files
+    const mongoResult = await db.updateResponse(responseId, req.session.userId, updatedData);
     
-    if (responseIndex === -1) {
+    if (mongoResult !== null && mongoResult !== false) {
+      // Successfully updated in MongoDB
+      console.log(`Response ${responseId} updated by user: ${req.session.username} (MongoDB)`);
+      return res.json({ 
+        success: true, 
+        message: 'Response updated successfully',
+        response: mongoResult
+      });
+    } else if (mongoResult === false) {
+      // Response not found or doesn't belong to user
       return res.status(404).json({ 
         success: false, 
-        message: 'Response not found' 
+        message: 'Response not found or you do not have permission to edit it' 
+      });
+    } else {
+      // MongoDB not available, fallback to JSON files
+      const responses = readJSONFile(RESPONSES_FILE);
+      
+      const responseIndex = responses.findIndex(r => r.id === responseId);
+      
+      if (responseIndex === -1) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Response not found' 
+        });
+      }
+      
+      // Check if the response belongs to the logged-in user
+      if (responses[responseIndex].userId !== req.session.userId) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You can only edit your own responses' 
+        });
+      }
+      
+      // Update the response (preserve userId and username)
+      responses[responseIndex] = {
+        ...responses[responseIndex],
+        ...updatedData,
+        userId: req.session.userId, // Ensure userId is preserved
+        username: req.session.username, // Ensure username is preserved
+        updatedAt: new Date().toISOString()
+      };
+      
+      writeJSONFile(RESPONSES_FILE, responses);
+      
+      console.log(`Response ${responseId} updated by user: ${req.session.username} (JSON file)`);
+      res.json({ 
+        success: true, 
+        message: 'Response updated successfully',
+        response: responses[responseIndex]
       });
     }
-    
-    // Check if the response belongs to the logged-in user
-    if (responses[responseIndex].userId !== req.session.userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You can only edit your own responses' 
-      });
-    }
-    
-    // Update the response (preserve userId and username)
-    responses[responseIndex] = {
-      ...responses[responseIndex],
-      ...updatedData,
-      userId: req.session.userId, // Ensure userId is preserved
-      username: req.session.username, // Ensure username is preserved
-      updatedAt: new Date().toISOString()
-    };
-    
-    writeJSONFile(RESPONSES_FILE, responses);
-    
-    console.log(`Response ${responseId} updated by user: ${req.session.username}`);
-    res.json({ 
-      success: true, 
-      message: 'Response updated successfully',
-      response: responses[responseIndex]
-    });
   } catch (error) {
     console.error('Error updating response:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to update response' 
+      message: 'Failed to update response: ' + error.message
     });
   }
 });
 
 // Delete a response (requires login, and must be user's own response)
-app.delete('/api/responses/:id', requireLogin, (req, res) => {
+app.delete('/api/responses/:id', requireLogin, async (req, res) => {
   try {
     const responseId = req.params.id;
-    const responses = readJSONFile(RESPONSES_FILE);
     
-    const responseIndex = responses.findIndex(r => r.id === responseId);
+    // Try MongoDB first, fallback to JSON files
+    const mongoResult = await db.deleteResponse(responseId, req.session.userId);
     
-    if (responseIndex === -1) {
+    if (mongoResult === true) {
+      // Successfully deleted from MongoDB
+      console.log(`Response ${responseId} deleted by user: ${req.session.username} (MongoDB)`);
+      return res.json({ 
+        success: true, 
+        message: 'Response deleted successfully'
+      });
+    } else if (mongoResult === false) {
+      // Response not found or doesn't belong to user
       return res.status(404).json({ 
         success: false, 
-        message: 'Response not found' 
+        message: 'Response not found or you do not have permission to delete it' 
+      });
+    } else {
+      // MongoDB not available, fallback to JSON files
+      const responses = readJSONFile(RESPONSES_FILE);
+      
+      const responseIndex = responses.findIndex(r => r.id === responseId);
+      
+      if (responseIndex === -1) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Response not found' 
+        });
+      }
+      
+      // Check if the response belongs to the logged-in user
+      if (responses[responseIndex].userId !== req.session.userId) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You can only delete your own responses' 
+        });
+      }
+      
+      // Remove the response
+      responses.splice(responseIndex, 1);
+      writeJSONFile(RESPONSES_FILE, responses);
+      
+      console.log(`Response ${responseId} deleted by user: ${req.session.username} (JSON file)`);
+      res.json({ 
+        success: true, 
+        message: 'Response deleted successfully'
       });
     }
-    
-    // Check if the response belongs to the logged-in user
-    if (responses[responseIndex].userId !== req.session.userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You can only delete your own responses' 
-      });
-    }
-    
-    // Remove the response
-    responses.splice(responseIndex, 1);
-    writeJSONFile(RESPONSES_FILE, responses);
-    
-    console.log(`Response ${responseId} deleted by user: ${req.session.username}`);
-    res.json({ 
-      success: true, 
-      message: 'Response deleted successfully'
-    });
   } catch (error) {
     console.error('Error deleting response:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to delete response' 
+      message: 'Failed to delete response: ' + error.message 
     });
   }
 });
@@ -755,10 +981,16 @@ app.get('/api/export', requireAuth, (req, res) => {
 });
 
 // Check payment status (requires login)
-app.get('/api/payment/status', requireLogin, (req, res) => {
+app.get('/api/payment/status', requireLogin, async (req, res) => {
   try {
-    const users = readJSONFile(USERS_FILE);
-    const user = users.find(u => u.id === req.session.userId);
+    // Try MongoDB first, fallback to JSON files
+    let user = await db.getUserById(req.session.userId);
+    
+    if (user === null) {
+      // Fallback to JSON files
+      const users = readJSONFile(USERS_FILE);
+      user = users.find(u => u.id === req.session.userId);
+    }
     
     if (!user) {
       return res.status(404).json({ 
@@ -785,7 +1017,7 @@ app.get('/api/payment/status', requireLogin, (req, res) => {
 });
 
 // Record payment completion (requires login)
-app.post('/api/payment/complete', requireLogin, (req, res) => {
+app.post('/api/payment/complete', requireLogin, async (req, res) => {
   try {
     console.log('Payment complete request:', {
       userId: req.session.userId,
@@ -802,16 +1034,27 @@ app.post('/api/payment/complete', requireLogin, (req, res) => {
       });
     }
     
-    const users = readJSONFile(USERS_FILE);
-    const userIndex = users.findIndex(u => u.id === req.session.userId);
+    // Try MongoDB first, fallback to JSON files
+    let user = await db.getUserById(req.session.userId);
+    let usingMongoDB = true;
     
-    console.log('User lookup:', {
-      userId: req.session.userId,
-      userIndex: userIndex,
-      totalUsers: users.length
-    });
+    if (user === null) {
+      // Fallback to JSON files
+      usingMongoDB = false;
+      const users = readJSONFile(USERS_FILE);
+      const userIndex = users.findIndex(u => u.id === req.session.userId);
+      
+      if (userIndex === -1) {
+        console.error('User not found for payment:', req.session.userId);
+        return res.status(404).json({ 
+          success: false, 
+          message: 'User not found. Please log in again.' 
+        });
+      }
+      user = users[userIndex];
+    }
     
-    if (userIndex === -1) {
+    if (!user) {
       console.error('User not found for payment:', req.session.userId);
       return res.status(404).json({ 
         success: false, 
@@ -820,19 +1063,41 @@ app.post('/api/payment/complete', requireLogin, (req, res) => {
     }
     
     // Update user payment status
-    users[userIndex].hasPayment = true;
-    users[userIndex].paymentPlan = plan;
-    users[userIndex].paymentDate = new Date().toISOString();
+    const paymentDate = new Date().toISOString();
+    const updateData = {
+      hasPayment: true,
+      paymentPlan: plan,
+      paymentDate: paymentDate
+    };
     
-    writeJSONFile(USERS_FILE, users);
-    
-    console.log(`Payment recorded for user: ${users[userIndex].username}, plan: ${plan}`);
+    if (usingMongoDB) {
+      // Update in MongoDB
+      const result = await db.updateUser(req.session.userId, updateData);
+      if (result) {
+        console.log(`Payment recorded for user: ${user.username}, plan: ${plan} (MongoDB)`);
+      } else {
+        console.error('Failed to update payment in MongoDB');
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Payment could not be recorded. Please try again.' 
+        });
+      }
+    } else {
+      // Update in JSON file
+      const users = readJSONFile(USERS_FILE);
+      const userIndex = users.findIndex(u => u.id === req.session.userId);
+      users[userIndex].hasPayment = true;
+      users[userIndex].paymentPlan = plan;
+      users[userIndex].paymentDate = paymentDate;
+      writeJSONFile(USERS_FILE, users);
+      console.log(`Payment recorded for user: ${user.username}, plan: ${plan} (JSON file)`);
+    }
     
     res.json({
       success: true,
       message: 'Payment recorded successfully',
       paymentPlan: plan,
-      paymentDate: users[userIndex].paymentDate
+      paymentDate: paymentDate
     });
   } catch (error) {
     console.error('Error recording payment:', error);
@@ -842,6 +1107,107 @@ app.post('/api/payment/complete', requireLogin, (req, res) => {
     });
   }
 });
+
+// ----- Stripe (real payments) -----
+function getAppUrl(req) {
+  const base = process.env.APP_URL;
+  if (base) return base.replace(/\/$/, '');
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3001';
+  return `${proto}://${host}`;
+}
+
+// Create Stripe Checkout Session (redirect user to Stripe to pay)
+app.post('/api/payment/create-checkout-session', requireLogin, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ success: false, message: 'Stripe is not configured. Set STRIPE_SECRET_KEY.' });
+  }
+  try {
+    const { plan, price } = req.body;
+    const planName = plan || 'premium';
+    const amountCents = Math.round((Number(price) || 100) * 100);
+    const baseUrl = getAppUrl(req);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: `Pathwise – ${planName}` },
+          unit_amount: amountCents
+        },
+        quantity: 1
+      }],
+      success_url: `${baseUrl}/payment-success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/payment-process.html`,
+      client_reference_id: req.session.userId,
+      metadata: { userId: req.session.userId, plan: planName }
+    });
+    res.json({ success: true, url: session.url });
+  } catch (err) {
+    console.error('Stripe create-checkout-session error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to create checkout session' });
+  }
+});
+
+// Verify Stripe session and mark user paid (called from payment-success page)
+app.get('/api/payment/verify-session', requireLogin, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ success: false, message: 'Stripe is not configured.' });
+  }
+  const sessionId = req.query.session_id;
+  if (!sessionId) {
+    return res.status(400).json({ success: false, message: 'session_id required' });
+  }
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({ success: false, message: 'Payment not completed' });
+    }
+    const userId = session.metadata?.userId || session.client_reference_id;
+    const plan = session.metadata?.plan || 'premium';
+    if (userId !== req.session.userId) {
+      return res.status(403).json({ success: false, message: 'Session does not match your account' });
+    }
+    const ok = await recordPaymentForUser(userId, plan);
+    if (!ok) {
+      return res.status(500).json({ success: false, message: 'Could not record payment' });
+    }
+    res.json({ success: true, paymentDate: new Date().toISOString() });
+  } catch (err) {
+    console.error('Stripe verify-session error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Verification failed' });
+  }
+});
+
+// Stripe webhook (receives checkout.session.completed)
+async function paymentWebhookHandler(req, res) {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).send('Stripe webhook not configured');
+  }
+  const sig = req.headers['stripe-signature'];
+  if (!sig) {
+    return res.status(400).send('Missing stripe-signature');
+  }
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Stripe webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  if (event.type !== 'checkout.session.completed') {
+    return res.status(200).send('OK');
+  }
+  const session = event.data.object;
+  const userId = session.metadata?.userId || session.client_reference_id;
+  const plan = session.metadata?.plan || 'premium';
+  if (!userId) {
+    console.error('Stripe webhook: no userId in session');
+    return res.status(200).send('OK');
+  }
+  await recordPaymentForUser(userId, plan);
+  res.status(200).send('OK');
+}
 
 // Serve login page
 app.get('/login.html', (req, res) => {
@@ -919,11 +1285,11 @@ app.post('/api/chat/colleges', requireLogin, async (req, res) => {
       });
     }
 
-    // Check if ChatGPT is available
-    if (!openai) {
+    // Check if Claude is available
+    if (!hasLLM) {
       return res.status(500).json({
         success: false,
-        message: 'ChatGPT integration is not available. Please configure OPENAI_API_KEY.'
+        message: 'AI integration is not available. Please configure ANTHROPIC_API_KEY in .env for Claude.'
       });
     }
 
@@ -973,18 +1339,11 @@ Please provide college recommendations in a clear, organized format. For each co
 Format your response as a list with clear explanations.`;
 
     try {
-      // Call ChatGPT
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: 'system', content: 'You are a helpful college counselor assistant. Provide personalized college recommendations based on student questionnaire responses.' },
-          { role: 'user', content: collegePrompt }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
-      });
-      
-      const collegeRecommendations = completion.choices[0].message.content;
+      const collegeRecommendations = await chatComplete(
+        'You are a helpful college counselor assistant. Provide personalized college recommendations based on student questionnaire responses.',
+        collegePrompt,
+        { maxTokens: 2048, temperature: 0.7 }
+      );
       
       console.log(`College recommendations generated for user ${req.session.username}`);
       
@@ -1008,6 +1367,164 @@ Format your response as a list with clear explanations.`;
   }
 });
 
+// College list with details - multi-step flow: (1) get list, (2) get details for each, (3) format
+app.post('/api/chat/colleges-detailed', requireLogin, async (req, res) => {
+  try {
+    const { allAnswers, listPrompt } = req.body;
+
+    if (!hasLLM) {
+      return res.status(500).json({
+        success: false,
+        message: 'AI integration is not available. Please configure ANTHROPIC_API_KEY in .env for Claude.'
+      });
+    }
+
+    // Load questions for formatting answers
+    const questions = readJSONFile(QUESTIONS_FILE);
+    const questionsMap = {};
+    questions.forEach(q => { questionsMap[q.id] = q; });
+
+    let postCollegeQuestionsMap = {};
+    try {
+      const postCollegeData = await db.getPostCollegeMessages();
+      if (postCollegeData && postCollegeData.questions && Array.isArray(postCollegeData.questions)) {
+        postCollegeData.questions.forEach(q => { postCollegeQuestionsMap[q.id] = q; });
+      }
+    } catch (err) {
+      console.error('Error loading post-college questions:', err);
+    }
+
+    const allQuestionsMap = { ...questionsMap, ...postCollegeQuestionsMap };
+    const systemFields = ['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions'];
+
+    // Format allAnswers for context
+    let allAnswersFormatted = '';
+    if (allAnswers && Object.keys(allAnswers).length > 0) {
+      const regularAnswers = { ...allAnswers };
+      const postCollegeAnswers = regularAnswers.postCollegeAnswers || {};
+      delete regularAnswers.postCollegeAnswers;
+
+      const regularFormatted = Object.entries(regularAnswers)
+        .filter(([qId, ans]) => {
+          if (systemFields.includes(qId)) return false;
+          if (ans === undefined || ans === null || ans === '') return false;
+          if (Array.isArray(ans) && ans.length === 0) return false;
+          return true;
+        })
+        .map(([qId, ans]) => {
+          const q = allQuestionsMap[qId] || questionsMap[qId];
+          const qText = q ? q.text : qId;
+          const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans);
+          if (!formattedAns || formattedAns.trim() === '') return null;
+          if (q && q.chatPrompt && q.chatPrompt.trim()) {
+            return q.chatPrompt.replace(/{answer}/g, formattedAns);
+          }
+          return `${qText}: ${formattedAns}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      const postCollegeFormatted = Object.entries(postCollegeAnswers)
+        .map(([qId, ans]) => {
+          const q = allQuestionsMap[qId] || postCollegeQuestionsMap[qId];
+          const qText = q ? q.text : qId;
+          const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans);
+          if (q && q.chatPrompt && q.chatPrompt.trim()) {
+            return q.chatPrompt.replace(/{answer}/g, formattedAns);
+          }
+          return `${qText}: ${formattedAns}`;
+        })
+        .filter(t => t && t.trim())
+        .join('\n');
+
+      if (regularFormatted && regularFormatted.trim()) {
+        allAnswersFormatted += 'Regular questionnaire answers:\n' + regularFormatted;
+      }
+      if (postCollegeFormatted && postCollegeFormatted.trim()) {
+        if (allAnswersFormatted) allAnswersFormatted += '\n\n';
+        allAnswersFormatted += 'Post-college question answers:\n' + postCollegeFormatted;
+      }
+    }
+
+    // Step 1: Get list of colleges
+    const defaultListPrompt = `Based on the following questionnaire responses from a student, provide a list of 5-8 college or university names that would be a good fit. Return ONLY the college names, one per line, no numbering, bullets, or extra text.
+
+Student's questionnaire responses:
+${allAnswersFormatted || 'No responses yet.'}`;
+
+    const listPromptToUse = (listPrompt && listPrompt.trim())
+      ? listPrompt.replace(/{allAnswers}/g, allAnswersFormatted || 'No responses yet.')
+      : defaultListPrompt;
+
+    const listText = await chatComplete(
+      'You are a college counselor. Return only college names, one per line, nothing else.',
+      listPromptToUse,
+      { maxTokens: 2048, temperature: 0.7 }
+    ) || '';
+
+    // Parse college names: split by newline, strip numbers/bullets, trim
+    const collegeNames = listText
+      .split(/\r?\n/)
+      .map(line => line.replace(/^\s*[\d\-*•.]+\s*/, '').replace(/\s*[-–—].*$/, '').trim())
+      .filter(name => name.length > 2)
+      .slice(0, 8);
+
+    if (collegeNames.length === 0) {
+      return res.json({
+        success: true,
+        message: 'I couldn\'t generate a college list from the responses. Please ensure you\'ve completed the questionnaire.'
+      });
+    }
+
+    // Step 2: Get details for each college (limit 6, run 2 at a time)
+    const MAX_COLLEGES = 6;
+    const collegesToDetail = collegeNames.slice(0, MAX_COLLEGES);
+    const detailPrompts = collegesToDetail.map(name => ({
+      college: name,
+      prompt: `Provide concise details about "${name}" for a college counselor context: location, notable programs, acceptance rate (if known), campus culture, and why it might be a good fit for students. Use 2-3 sentences.`
+    }));
+
+    const details = [];
+    for (let i = 0; i < detailPrompts.length; i += 2) {
+      const batch = detailPrompts.slice(i, i + 2);
+      const batchResults = await Promise.all(
+        batch.map(async ({ college, prompt }) => {
+          const text = await chatComplete(
+            'You are a college counselor. Provide brief, factual details.',
+            prompt,
+            { maxTokens: 800, temperature: 0.5 }
+          );
+          return { college, text: text || '' };
+        })
+      );
+      details.push(...batchResults);
+    }
+
+    // Step 3: Format combined output
+    let formatted = '**College recommendations with details:**\n\n';
+    details.forEach(({ college, text }) => {
+      formatted += `### ${college}\n\n${text.trim()}\n\n`;
+    });
+
+    if (collegeNames.length > MAX_COLLEGES) {
+      formatted += `*Also considered: ${collegeNames.slice(MAX_COLLEGES).join(', ')}*`;
+    }
+
+    console.log(`College list + details generated for user ${req.session.username} (${details.length} colleges)`);
+
+    res.json({
+      success: true,
+      message: formatted
+    });
+  } catch (error) {
+    console.error('Error in colleges-detailed:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate college list with details.'
+    });
+  }
+});
+
 // Question-specific ChatGPT endpoint (for responses after each question)
 app.post('/api/chat/question', requireLogin, async (req, res) => {
   try {
@@ -1020,11 +1537,11 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
       });
     }
 
-    // Check if ChatGPT is available
-    if (!openai) {
+    // Check if Claude is available
+    if (!hasLLM) {
       return res.status(500).json({
         success: false,
-        message: 'ChatGPT integration is not available. Please configure OPENAI_API_KEY.'
+        message: 'AI integration is not available. Please configure ANTHROPIC_API_KEY in .env for Claude.'
       });
     }
 
@@ -1035,8 +1552,24 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
       questions.forEach(q => {
         questionsMap[q.id] = q;
       });
+      
+      // Also get post-college questions to format post-college answers
+      let postCollegeQuestionsMap = {};
+      try {
+        const postCollegeData = await db.getPostCollegeMessages();
+        if (postCollegeData && postCollegeData.questions && Array.isArray(postCollegeData.questions)) {
+          postCollegeData.questions.forEach(q => {
+            postCollegeQuestionsMap[q.id] = q;
+          });
+        }
+      } catch (error) {
+        console.error('Error loading post-college questions for formatting:', error);
+      }
+      
+      // Combine both question maps
+      const allQuestionsMap = { ...questionsMap, ...postCollegeQuestionsMap };
 
-      const currentQuestion = questionsMap[questionId];
+      const currentQuestion = allQuestionsMap[questionId] || questionsMap[questionId];
 
       // Build context with all answers formatted using question-specific prompts if available
       let contextPrompt = prompt;
@@ -1051,11 +1584,67 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
         }
       }
       
+      // Debug: Log what we received
+      console.log('Received for ChatGPT:', {
+        questionId,
+        hasAllAnswers: !!allAnswers,
+        allAnswersKeys: allAnswers ? Object.keys(allAnswers) : [],
+        allAnswersSample: allAnswers ? JSON.stringify(allAnswers).substring(0, 500) : 'none',
+        hasPostCollegeAnswers: allAnswers && allAnswers.postCollegeAnswers ? Object.keys(allAnswers.postCollegeAnswers).length : 0,
+        postCollegeAnswersSample: allAnswers && allAnswers.postCollegeAnswers ? JSON.stringify(allAnswers.postCollegeAnswers).substring(0, 300) : 'none'
+      });
+      
       // If allAnswers is provided, add formatted context
+      // Handle both regular answers and post-college answers
       if (allAnswers && Object.keys(allAnswers).length > 0) {
-        const allAnswersFormatted = Object.entries(allAnswers)
+        // Separate regular answers from post-college answers
+        const regularAnswers = { ...allAnswers };
+        const postCollegeAnswers = regularAnswers.postCollegeAnswers || {};
+        delete regularAnswers.postCollegeAnswers;
+        
+        // Format regular answers
+        // Filter out empty/null/undefined answers and system fields
+        const systemFields = ['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions'];
+        const regularAnswersFormatted = Object.entries(regularAnswers)
+          .filter(([qId, ans]) => {
+            // Skip system fields and empty answers
+            if (systemFields.includes(qId)) return false;
+            if (ans === undefined || ans === null || ans === '') return false;
+            if (Array.isArray(ans) && ans.length === 0) return false;
+            return true;
+          })
           .map(([qId, ans]) => {
-            const question = questionsMap[qId];
+            const question = allQuestionsMap[qId] || questionsMap[qId];
+            const qText = question ? question.text : qId;
+            
+            // Format the answer
+            let formattedAns;
+            if (Array.isArray(ans)) {
+              formattedAns = ans.join(', ');
+            } else {
+              formattedAns = String(ans);
+            }
+            
+            // Skip if formatted answer is empty
+            if (!formattedAns || formattedAns.trim() === '') {
+              return null;
+            }
+            
+            // Use question-specific prompt if available
+            if (question && question.chatPrompt && question.chatPrompt.trim()) {
+              return question.chatPrompt.replace(/{answer}/g, formattedAns);
+            }
+            
+            // Always include question text with answer: "Question: Answer"
+            return `${qText}: ${formattedAns}`;
+          })
+          .filter(text => text && text.trim()) // Remove null/empty entries
+          .join('\n');
+        
+        // Format post-college answers
+        const postCollegeAnswersFormatted = Object.entries(postCollegeAnswers)
+          .map(([qId, ans]) => {
+            const question = allQuestionsMap[qId] || postCollegeQuestionsMap[qId];
             const qText = question ? question.text : qId;
             
             // Format the answer
@@ -1074,13 +1663,76 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
             // Always include question text with answer: "Question: Answer"
             return `${qText}: ${formattedAns}`;
           })
+          .filter(text => text.trim()) // Remove empty entries
           .join('\n');
         
+        // Combine both formatted answer sets
+        let allAnswersFormatted = '';
+        if (regularAnswersFormatted && regularAnswersFormatted.trim()) {
+          allAnswersFormatted += 'Regular questionnaire answers:\n' + regularAnswersFormatted;
+        }
+        if (postCollegeAnswersFormatted && postCollegeAnswersFormatted.trim()) {
+          if (allAnswersFormatted) allAnswersFormatted += '\n\n';
+          allAnswersFormatted += 'Post-college question answers:\n' + postCollegeAnswersFormatted;
+        }
+        
+        // Debug: Log formatted answers
+        console.log('Formatted answers for context:', {
+          regularAnswersCount: Object.keys(regularAnswers).length,
+          regularAnswersFormattedCount: regularAnswersFormatted ? regularAnswersFormatted.split('\n').length : 0,
+          postCollegeAnswersCount: Object.keys(postCollegeAnswers).length,
+          postCollegeAnswersFormattedCount: postCollegeAnswersFormatted ? postCollegeAnswersFormatted.split('\n').length : 0,
+          totalLength: allAnswersFormatted.length,
+          regularAnswersSample: regularAnswersFormatted ? regularAnswersFormatted.substring(0, 500) : 'empty',
+          postCollegeAnswersSample: postCollegeAnswersFormatted ? postCollegeAnswersFormatted.substring(0, 500) : 'empty',
+          hasRegularAnswers: !!regularAnswersFormatted && regularAnswersFormatted.trim().length > 0,
+          hasPostCollegeAnswers: !!postCollegeAnswersFormatted && postCollegeAnswersFormatted.trim().length > 0
+        });
+        
+        // Check if prompt already has {allAnswers} replaced (client-side replacement)
+        // If it does, we still want to add our formatted context to ensure completeness
+        const promptHasAllAnswers = prompt.includes('Regular questionnaire answers:') || prompt.includes('Post-college question answers:');
+        
         // Always include current question and answer at the top (even if it's in allAnswers, it's clearer this way)
-        if (questionText && formattedCurrentAns) {
-          contextPrompt = `Current question: ${questionText}\nCurrent answer: ${formattedCurrentAns}\n\nAll previous answers:\n${allAnswersFormatted}\n\n${prompt}`;
+        // Even if answer is empty (when going back), still include the context
+        if (questionText) {
+          if (allAnswersFormatted && allAnswersFormatted.trim()) {
+            // We have previous answers, include them
+            // If prompt already has answers, append our formatted version for completeness
+            if (promptHasAllAnswers) {
+              // Prompt already has answers, but add our formatted version to ensure all context is included
+              if (formattedCurrentAns) {
+                contextPrompt = `Current question: ${questionText}\nCurrent answer: ${formattedCurrentAns}\n\nComplete user information:\n${allAnswersFormatted}\n\n${prompt}`;
+              } else {
+                contextPrompt = `Current question: ${questionText}\n\nComplete user information:\n${allAnswersFormatted}\n\n${prompt}`;
+              }
+            } else {
+              // Prompt doesn't have answers, add them
+              if (formattedCurrentAns) {
+                contextPrompt = `Current question: ${questionText}\nCurrent answer: ${formattedCurrentAns}\n\nAll previous answers:\n${allAnswersFormatted}\n\n${prompt}`;
+              } else {
+                // Answer is empty (going back), but still include all previous answers
+                contextPrompt = `Current question: ${questionText}\n\nAll previous answers:\n${allAnswersFormatted}\n\n${prompt}`;
+              }
+            }
+          } else {
+            // No previous answers formatted, just use current question/answer
+            if (formattedCurrentAns) {
+              contextPrompt = `Current question: ${questionText}\nCurrent answer: ${formattedCurrentAns}\n\n${prompt}`;
+            } else {
+              contextPrompt = `Current question: ${questionText}\n\n${prompt}`;
+            }
+          }
         } else {
-          contextPrompt = `All previous answers:\n${allAnswersFormatted}\n\n${prompt}`;
+          if (allAnswersFormatted && allAnswersFormatted.trim()) {
+            if (promptHasAllAnswers) {
+              contextPrompt = `Complete user information:\n${allAnswersFormatted}\n\n${prompt}`;
+            } else {
+              contextPrompt = `All previous answers:\n${allAnswersFormatted}\n\n${prompt}`;
+            }
+          } else {
+            contextPrompt = prompt;
+          }
         }
       } else if (questionText && formattedCurrentAns) {
         // If no previous answers, just include current question and answer
@@ -1103,7 +1755,7 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
           const ragResult = await ragQueryHandler.query(ragQueryToUse, {
             topK: 5,
             temperature: 0.7,
-            maxTokens: 1000
+            maxTokens: 2048
           });
 
           if (ragResult.success && ragResult.sources && ragResult.sources.length > 0) {
@@ -1126,34 +1778,38 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
       // Replace {ragResults} placeholder in the prompt
       let finalPrompt = contextPrompt.replace(/{ragResults}/g, ragResults || 'No RAG results available.');
       
-      // Call ChatGPT with the formatted prompt
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: 'system', content: 'You are a helpful counselor assistant. Provide brief, helpful responses based on all the context provided about the user\'s previous answers and any relevant information from the knowledge base.' },
-          { role: 'user', content: finalPrompt }
-        ],
-        max_tokens: 500,
-        temperature: 0.7
-      });
+      // Debug: Log the final prompt being sent to ChatGPT
+      console.log('Final prompt to Claude:');
+      console.log('  Length:', finalPrompt.length);
+      console.log('  Contains "Regular questionnaire answers:":', finalPrompt.includes('Regular questionnaire answers:'));
+      console.log('  Contains "Post-college question answers:":', finalPrompt.includes('Post-college question answers:'));
+      console.log('  Contains "All previous answers:":', finalPrompt.includes('All previous answers:'));
+      console.log('  Contains "Complete user information:":', finalPrompt.includes('Complete user information:'));
+      console.log('  First 1500 chars:', finalPrompt.substring(0, 1500));
+      console.log('  Last 500 chars:', finalPrompt.substring(Math.max(0, finalPrompt.length - 500)));
       
-      const response = completion.choices[0].message.content;
+      const response = await chatComplete(
+        "You are a helpful counselor assistant. Provide brief, helpful responses based on all the context provided about the user's previous answers and any relevant information from the knowledge base.",
+        finalPrompt,
+        { maxTokens: 2048, temperature: 0.7 }
+      );
       
-      console.log(`Question-specific ChatGPT response for question ${questionId} (with ${Object.keys(allAnswers || {}).length} previous answers${ragResults ? ' + RAG' : ''})`);
+      console.log(`Question-specific Claude response for question ${questionId} (with ${Object.keys(allAnswers || {}).length} previous answers${ragResults ? ' + RAG' : ''})`);
       
       res.json({
         success: true,
         message: response
       });
-    } catch (chatGPTError) {
-      console.error('ChatGPT error in question response:', chatGPTError);
+    } catch (chatError) {
+      console.error('AI error in question response:', chatError);
+      const errMsg = chatError && chatError.message ? chatError.message : 'Unknown error';
       res.status(500).json({
         success: false,
-        message: 'Failed to generate response. Please try again later.'
+        message: `Failed to generate response: ${errMsg}`
       });
     }
   } catch (error) {
-    console.error('Error processing question ChatGPT response:', error);
+    console.error('Error processing question Claude response:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to process response'
@@ -1179,12 +1835,12 @@ app.post('/api/chat', requireLogin, async (req, res) => {
     // Find matching preset response based on keywords
     const presetResponse = findMatchingResponse(message, prompts);
     
-    // Check if ChatGPT should be used
-    const useChatGPT = prompts.useChatGPT !== false && openai !== null;
+    // Check if Claude should be used
+    const useClaude = hasLLM && (prompts.useClaude !== false || prompts.useChatGPT !== false);
     
     let finalResponse = presetResponse;
     
-    if (useChatGPT) {
+    if (useClaude) {
       try {
         // Get user's questionnaire responses for context
         // Prefer userResponses from client, fallback to database lookup
@@ -1239,7 +1895,7 @@ app.post('/api/chat', requireLogin, async (req, res) => {
           systemPrompt += `\n\nUser's questionnaire responses:\n${responseSummary}`;
         }
         
-        // Build messages array for ChatGPT
+        // Build messages array for Claude
         const messages = [
           { role: 'system', content: systemPrompt }
         ];
@@ -1260,32 +1916,26 @@ app.post('/api/chat', requireLogin, async (req, res) => {
         // Add current user message
         messages.push({ role: 'user', content: message });
         
-        // Call ChatGPT
-        const completion = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: messages,
-          max_tokens: 500,
-          temperature: 0.7
-        });
+        const chatGPTResponse = await chatCompleteWithMessages(
+          systemPrompt,
+          messages.filter(m => m.role !== 'system'),
+          { maxTokens: 2048, temperature: 0.7 }
+        );
         
-        const chatGPTResponse = completion.choices[0].message.content;
-        
-        // Combine preset and ChatGPT responses based on weights
+        // Combine preset and Claude responses based on weights
         const presetWeight = prompts.presetWeight || 0.3;
-        const chatGPTWeight = prompts.chatGPTWeight || 0.7;
+        const claudeWeight = prompts.claudeWeight || prompts.chatGPTWeight || 0.7;
         
-        // If preset response is the default, prioritize ChatGPT
         if (presetResponse === prompts.default) {
           finalResponse = chatGPTResponse;
         } else {
-          // Combine both responses
           finalResponse = `${presetResponse}\n\n${chatGPTResponse}`;
         }
         
-        console.log(`Chat message from user ${req.session.username}: ${message.substring(0, 50)}... (ChatGPT + Preset)`);
+        console.log(`Chat message from user ${req.session.username}: ${message.substring(0, 50)}... (Claude + Preset)`);
       } catch (chatGPTError) {
-        console.error('ChatGPT error, using preset only:', chatGPTError);
-        // Fall back to preset response if ChatGPT fails
+        console.error('Claude error, using preset only:', chatGPTError);
+        // Fall back to preset response if Claude fails
         finalResponse = presetResponse;
       }
     } else {
@@ -1371,35 +2021,29 @@ app.post('/api/chat/test', requireLogin, async (req, res) => {
       });
     }
 
-    if (!openai) {
+    if (!hasLLM) {
       return res.status(500).json({
         success: false,
-        message: 'ChatGPT integration is not available. Please configure OPENAI_API_KEY.'
+        message: 'AI integration is not available. Please configure ANTHROPIC_API_KEY in .env for Claude.'
       });
     }
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      });
-
-      const response = completion.choices[0].message.content;
+      const response = await chatComplete(
+        'You are a helpful assistant.',
+        prompt,
+        { maxTokens: 2048, temperature: 0.7 }
+      );
 
       res.json({
         success: true,
         message: response
       });
     } catch (chatGPTError) {
-      console.error('ChatGPT error in test:', chatGPTError);
+      console.error('Claude error in test:', chatGPTError);
       res.status(500).json({
         success: false,
-        message: 'Failed to get response from ChatGPT: ' + chatGPTError.message
+        message: 'Failed to get response from Claude: ' + chatGPTError.message
       });
     }
   } catch (error) {
@@ -1433,7 +2077,7 @@ app.post('/api/rag/query', requireLogin, async (req, res) => {
     const result = await ragQueryHandler.query(query, {
       topK,
       temperature: 0.7,
-      maxTokens: 1000
+      maxTokens: 2048
     });
 
     res.json(result);
@@ -1484,9 +2128,9 @@ app.get('/api/rag/documents', requireLogin, (req, res) => {
 });
 
 // Clear all documents
-app.delete('/api/rag/documents', requireLogin, (req, res) => {
+app.delete('/api/rag/documents', requireLogin, async (req, res) => {
   try {
-    vectorStore.clear();
+    await vectorStore.clear();
     res.json({
       success: true,
       message: 'All documents cleared'
@@ -1501,10 +2145,10 @@ app.delete('/api/rag/documents', requireLogin, (req, res) => {
 });
 
 // Delete documents by source file
-app.delete('/api/rag/documents/:source', requireLogin, (req, res) => {
+app.delete('/api/rag/documents/:source', requireLogin, async (req, res) => {
   try {
     const source = decodeURIComponent(req.params.source);
-    const removed = vectorStore.removeBySource(source);
+    const removed = await vectorStore.removeBySource(source);
     
     res.json({
       success: true,
@@ -1551,11 +2195,26 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Data stored in: ${DATA_DIR}`);
   console.log(`Session secret configured: ${!!process.env.SESSION_SECRET}`);
+  console.log(`MongoDB URI configured: ${!!process.env.MONGODB_URI}`);
+  
+  // Connect to MongoDB on startup
+  try {
+    const database = await db.connectToDatabase();
+    if (database) {
+      console.log('✅ MongoDB: All data will be saved to MongoDB Atlas');
+    } else {
+      console.log('⚠️  MongoDB: Using JSON file storage (data will not persist on Render free tier)');
+    }
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.log('⚠️  Falling back to JSON file storage');
+  }
+  
   console.log('ROUTES AVAILABLE:');
     console.log('  GET  /');
     console.log('  GET  /payment');

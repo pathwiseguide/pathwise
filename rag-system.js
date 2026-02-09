@@ -3,6 +3,7 @@ const pdf = require('pdf-parse');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const db = require('./db');
 
 // Ensure data directory exists
 const DATA_DIR = path.join(__dirname, 'data');
@@ -10,23 +11,47 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Persistent vector store with file-based storage
+// Persistent vector store with MongoDB support and file-based fallback
 class VectorStore {
   constructor(storagePath) {
     this.storagePath = storagePath || path.join(__dirname, 'data', 'vector-store.json');
     this.documents = []; // { id, text, embedding, metadata }
     this.embeddings = []; // For similarity search
+    this.useMongoDB = false; // Will be set after checking MongoDB connection
+    this.loadingPromise = null; // Track async loading
+    // Load synchronously from JSON first, then check MongoDB
     this.loadFromDisk();
+    // Start async MongoDB check in background
+    this.initializeMongoDB();
   }
-
-  // Load data from disk
+  
+  async initializeMongoDB() {
+    try {
+      const mongoDocs = await db.getVectorStoreDocuments();
+      if (mongoDocs !== null && mongoDocs.length > 0) {
+        this.useMongoDB = true;
+        this.documents = mongoDocs;
+        this.embeddings = mongoDocs.map(doc => doc.embedding);
+        console.log(`✅ Vector store using MongoDB (${this.documents.length} documents)`);
+      } else if (mongoDocs !== null) {
+        // MongoDB available but empty - use it for new documents
+        this.useMongoDB = true;
+        console.log('✅ Vector store using MongoDB (empty, will save new documents there)');
+      }
+    } catch (error) {
+      console.log('⚠️  MongoDB not available for vector store, using JSON files');
+      this.useMongoDB = false;
+    }
+  }
+  
+  // Load data from disk (synchronous, for initial load)
   loadFromDisk() {
     try {
       if (fs.existsSync(this.storagePath)) {
         const data = JSON.parse(fs.readFileSync(this.storagePath, 'utf8'));
         this.documents = data.documents || [];
         this.embeddings = data.embeddings || [];
-        console.log(`Loaded ${this.documents.length} documents from persistent storage`);
+        console.log(`Loaded ${this.documents.length} documents from JSON file`);
       } else {
         console.log('No existing vector store found, starting fresh');
       }
@@ -37,8 +62,15 @@ class VectorStore {
     }
   }
 
-  // Save data to disk
-  saveToDisk() {
+  // Save data to storage (MongoDB or disk)
+  async saveToStorage() {
+    if (this.useMongoDB) {
+      // Note: We don't need to save all at once since addDocument saves individually
+      // This is mainly for compatibility
+      return;
+    }
+    
+    // Fallback to JSON file
     try {
       // Ensure directory exists
       const dir = path.dirname(this.storagePath);
@@ -58,7 +90,7 @@ class VectorStore {
     }
   }
 
-  addDocument(text, embedding, metadata = {}) {
+  async addDocument(text, embedding, metadata = {}) {
     const id = crypto.randomUUID();
     const doc = {
       id,
@@ -69,14 +101,50 @@ class VectorStore {
         addedAt: new Date().toISOString()
       }
     };
+    
+    // Add to in-memory arrays
     this.documents.push(doc);
     this.embeddings.push(embedding);
-    this.saveToDisk(); // Persist after each addition
+    
+    // Save to MongoDB if available
+    if (this.useMongoDB) {
+      try {
+        const result = await db.addVectorStoreDocument(doc);
+        if (result !== null) {
+          return id;
+        } else {
+          // MongoDB failed, fall back to JSON
+          this.useMongoDB = false;
+          await this.saveToStorage();
+        }
+      } catch (error) {
+        console.error('Error saving to MongoDB, falling back to JSON:', error);
+        this.useMongoDB = false;
+        await this.saveToStorage();
+      }
+    } else {
+      // Save to JSON file
+      await this.saveToStorage();
+    }
+    
     return id;
   }
 
   // Simple cosine similarity search
-  search(queryEmbedding, topK = 5) {
+  async search(queryEmbedding, topK = 5) {
+    // If using MongoDB, try MongoDB search first
+    if (this.useMongoDB) {
+      try {
+        const results = await db.searchVectorStore(queryEmbedding, topK);
+        if (results !== null) {
+          return results;
+        }
+      } catch (error) {
+        console.error('Error searching MongoDB, falling back to in-memory:', error);
+      }
+    }
+    
+    // Fallback to in-memory search
     if (this.embeddings.length === 0) return [];
 
     const similarities = this.embeddings.map((emb, idx) => {
@@ -113,15 +181,38 @@ class VectorStore {
     return this.documents;
   }
 
-  clear() {
+  async clear() {
+    if (this.useMongoDB) {
+      try {
+        await db.clearVectorStore();
+      } catch (error) {
+        console.error('Error clearing MongoDB vector store:', error);
+      }
+    }
+    
     this.documents = [];
     this.embeddings = [];
-    this.saveToDisk(); // Persist the clear operation
+    await this.saveToStorage(); // Persist the clear operation
   }
 
   // Remove documents by source file
-  removeBySource(source) {
+  async removeBySource(source) {
     const initialLength = this.documents.length;
+    
+    if (this.useMongoDB) {
+      try {
+        const removed = await db.removeVectorStoreDocumentsBySource(source);
+        if (removed !== null) {
+          // Reload from MongoDB to sync in-memory arrays
+          await this.loadFromStorage();
+          return removed;
+        }
+      } catch (error) {
+        console.error('Error removing from MongoDB, falling back to in-memory:', error);
+      }
+    }
+    
+    // Fallback to in-memory removal
     const indicesToRemove = [];
     
     this.documents.forEach((doc, index) => {
@@ -137,7 +228,7 @@ class VectorStore {
     });
 
     if (indicesToRemove.length > 0) {
-      this.saveToDisk();
+      await this.saveToStorage();
       console.log(`Removed ${indicesToRemove.length} chunks from source: ${source}`);
     }
 
@@ -224,7 +315,7 @@ class DocumentProcessor {
       const chunk = chunks[i];
       const embedding = await this.generateEmbedding(chunk);
       
-      const docId = this.vectorStore.addDocument(chunk, embedding, {
+      const docId = await this.vectorStore.addDocument(chunk, embedding, {
         ...metadata,
         chunkIndex: i,
         totalChunks: chunks.length,
@@ -252,7 +343,7 @@ class DocumentProcessor {
     const queryEmbedding = await this.generateEmbedding(query);
     
     // Search vector store
-    const results = this.vectorStore.search(queryEmbedding, topK);
+    const results = await this.vectorStore.search(queryEmbedding, topK);
     
     return results;
   }
@@ -260,9 +351,10 @@ class DocumentProcessor {
 
 // RAG Query Handler
 class RAGQueryHandler {
-  constructor(documentProcessor, openai) {
+  constructor(documentProcessor, openai, chatCompleteFn = null) {
     this.documentProcessor = documentProcessor;
     this.openai = openai;
+    this.chatComplete = chatCompleteFn;
   }
 
   // Query with RAG - retrieves relevant docs and generates response
@@ -270,7 +362,7 @@ class RAGQueryHandler {
     const {
       topK = 5,
       temperature = 0.7,
-      maxTokens = 1000
+      maxTokens = 2048
     } = options;
 
     // Search for relevant documents
@@ -316,26 +408,21 @@ class RAGQueryHandler {
   }
 
   async queryOpenAI(query, context, options) {
-    const prompt = `You are a helpful assistant that answers questions based on the provided documents.
-
-Documents:
+    const system = 'You are a helpful assistant that answers questions based on provided documents.';
+    const userContent = `Documents:
 ${context}
 
 Question: ${query}
 
 Answer the question based on the documents above. If the answer is not in the documents, say so. Cite which document(s) you used when possible.`;
 
-    const completion = await this.openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant that answers questions based on provided documents.' },
-        { role: 'user', content: prompt }
-      ],
+    if (!this.chatComplete) {
+      throw new Error('Claude is required for RAG chat. Set ANTHROPIC_API_KEY in .env');
+    }
+    return await this.chatComplete(system, userContent, {
       temperature: options.temperature,
-      max_tokens: options.maxTokens
+      maxTokens: options.maxTokens
     });
-
-    return completion.choices[0].message.content;
   }
 }
 

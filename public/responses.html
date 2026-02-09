@@ -6,52 +6,6 @@
     <title>My Responses - Pathwise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        .nav-header {
-            background: white;
-            padding: 15px 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .nav-header .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #667eea;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .nav-links a, .nav-links button {
-            color: #333;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.3s;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: inherit;
-            font-family: inherit;
-        }
-
-        .nav-links a:hover, .nav-links button:hover {
-            background: #f0f4ff;
-            color: #667eea;
-        }
-
-        .nav-links .auth-button {
-            margin-left: auto;
-        }
-
         .responses-container {
             background: white;
             padding: 40px;
@@ -66,7 +20,7 @@
         }
 
         .responses-header h1 {
-            color: #667eea;
+            color: #000;
             margin-bottom: 10px;
         }
 
@@ -80,12 +34,12 @@
         }
 
         .response-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+            border-color: #555;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         .response-card.editing {
-            border-color: #667eea;
+            border-color: #555;
             background: white;
         }
 
@@ -118,21 +72,21 @@
         }
 
         .btn-edit {
-            background: #667eea;
+            background: #555;
             color: white;
         }
 
         .btn-edit:hover {
-            background: #5568d3;
+            background: #444;
         }
 
         .btn-delete {
-            background: #dc3545;
+            background: #555;
             color: white;
         }
 
         .btn-delete:hover {
-            background: #c82333;
+            background: #444;
         }
 
         .btn-save {
@@ -162,11 +116,11 @@
             padding: 15px;
             background: white;
             border-radius: 8px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #555;
         }
 
         .answer-item.editing {
-            border-left-color: #28a745;
+            border-left-color: #666;
         }
 
         .answer-question {
@@ -185,7 +139,7 @@
 
         .answer-value.editing {
             background: white;
-            border: 2px solid #667eea;
+            border: 2px solid #555;
             padding: 10px;
         }
 
@@ -203,7 +157,7 @@
         .answer-value input:focus,
         .answer-value textarea:focus,
         .answer-value select:focus {
-            outline: 2px solid #667eea;
+            outline: 2px solid #555;
         }
 
         .empty-state {
@@ -213,7 +167,7 @@
         }
 
         .empty-state h2 {
-            color: #667eea;
+            color: #333;
             margin-bottom: 15px;
         }
 
@@ -223,7 +177,7 @@
 
         .option-tag {
             display: inline-block;
-            background: #667eea;
+            background: #555;
             color: white;
             padding: 5px 12px;
             border-radius: 20px;
@@ -232,7 +186,7 @@
         }
 
         .new-response-btn {
-            background: #667eea;
+            background: #555;
             color: white;
             border: none;
             padding: 12px 24px;
@@ -244,7 +198,7 @@
         }
 
         .new-response-btn:hover {
-            background: #5568d3;
+            background: #444;
         }
     </style>
 </head>
@@ -252,9 +206,8 @@
     <div class="container">
         <!-- Navigation Header -->
         <header class="nav-header">
-            <div class="logo">Pathwise</div>
+            <a href="/" class="logo">Pathwise</a>
             <div class="nav-links">
-                <a href="/">Home</a>
                 <a href="/payment" id="plansLink" style="display: none;">Plans</a>
                 <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
                 <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>

@@ -25,7 +25,7 @@ let chatSendBtn;
 let currentQuestionIndex = 0;
 let isWaitingForAnswer = false;
 let isChatMode = false; // Whether we're in chat mode (after first response) or questionnaire mode
-let conversationHistory = []; // Store conversation history for ChatGPT context
+let conversationHistory = []; // Store conversation history for Claude context
 let savedUserResponses = null; // Store user's saved questionnaire responses for chat context
 
 // Initialize DOM elements
@@ -211,6 +211,7 @@ async function checkIfHasResponse() {
 
 // Load questions from API (force load even if user has submitted)
 async function loadQuestions(forceLoad = false) {
+    let timeoutId = null;
     try {
         // Check if user has already submitted a response (unless force loading)
         if (!forceLoad) {
@@ -228,6 +229,20 @@ async function loadQuestions(forceLoad = false) {
         if (loadingDiv) {
             loadingDiv.style.display = 'block';
             loadingDiv.textContent = 'Loading questions... (This may take up to 30 seconds on first load)';
+            
+            // Add a progress indicator that updates every second
+            let progressSeconds = 0;
+            const progressInterval = setInterval(() => {
+                progressSeconds++;
+                if (loadingDiv && loadingDiv.style.display !== 'none') {
+                    loadingDiv.textContent = `Loading questions... (${progressSeconds}s) - This may take up to 30 seconds on first load`;
+                } else {
+                    clearInterval(progressInterval);
+                }
+            }, 1000);
+            
+            // Store interval ID to clear it later
+            window._loadingProgressInterval = progressInterval;
         }
         
         // Make sure questionnaire container is visible
@@ -237,21 +252,32 @@ async function loadQuestions(forceLoad = false) {
         }
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
         console.log('Fetching questions from:', `${API_BASE}/questions`);
-        const response = await fetch(`${API_BASE}/questions`, {
-            signal: controller.signal,
-            credentials: 'include' // Include session cookie
-        });
+        console.log('Request started at:', new Date().toISOString());
         
-        clearTimeout(timeoutId);
+        let response;
+        try {
+            response = await fetch(`${API_BASE}/questions`, {
+                signal: controller.signal,
+                credentials: 'include' // Include session cookie
+            });
+            console.log('Request completed at:', new Date().toISOString());
+        } catch (fetchError) {
+            if (timeoutId) clearTimeout(timeoutId);
+            console.error('Fetch error:', fetchError);
+            throw fetchError;
+        }
+        
+        if (timeoutId) clearTimeout(timeoutId);
         
         console.log('Questions response status:', response.status);
         
         if (!response.ok) {
             if (response.status === 401) {
                 console.log('Unauthorized - redirecting to login');
+                if (loadingDiv) loadingDiv.style.display = 'none';
                 window.location.href = '/login.html';
                 return;
             }
@@ -260,43 +286,71 @@ async function loadQuestions(forceLoad = false) {
             throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
         }
         
-        questions = await response.json();
+        console.log('Parsing response JSON...');
+        let questionsData;
+        try {
+            questionsData = await response.json();
+            console.log('Response parsed successfully. Type:', Array.isArray(questionsData) ? 'array' : typeof questionsData);
+        } catch (jsonError) {
+            console.error('Error parsing JSON:', jsonError);
+            const textResponse = await response.text();
+            console.error('Response text:', textResponse.substring(0, 500));
+            throw new Error('Invalid JSON response from server: ' + jsonError.message);
+        }
+        
+        // Handle both array response and object with questions property
+        if (Array.isArray(questionsData)) {
+            questions = questionsData;
+            console.log('Questions is array, length:', questions.length);
+        } else if (questionsData && Array.isArray(questionsData.questions)) {
+            questions = questionsData.questions;
+            console.log('Questions from object.questions, length:', questions.length);
+        } else if (questionsData && questionsData.error) {
+            throw new Error(questionsData.error + (questionsData.details ? ': ' + questionsData.details : ''));
+        } else {
+            questions = [];
+            console.warn('Unexpected response format:', questionsData);
+        }
+        
         console.log('Loaded questions:', questions.length);
         
         if (questions.length === 0) {
-            // Initialize with sample questions if empty
-            questions = [
-                {
-                    id: '1',
-                    text: 'What is your name?',
-                    type: 'text',
-                    required: true,
-                    page: 1
-                },
-                {
-                    id: '2',
-                    text: 'What is your email?',
-                    type: 'email',
-                    required: true,
-                    page: 1
-                },
-                {
-                    id: '3',
-                    text: 'How would you rate your experience?',
-                    type: 'radio',
-                    options: ['Excellent', 'Good', 'Fair', 'Poor'],
-                    required: true,
-                    page: 2
-                }
-            ];
-            await saveQuestionsToServer(questions);
+            console.warn('No questions found in database. Questions may need to be configured in the admin panel.');
+            if (loadingDiv) {
+                loadingDiv.innerHTML = 'No questions configured. Please contact support or use the admin panel to add questions.<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>';
+            }
+            return;
         }
         
         // Calculate total pages
         totalPages = Math.max(...questions.map(q => q.page || 1), 1);
         currentPage = 1;
         
-        renderQuestionnaire();
+        console.log('Questions loaded successfully. Total pages:', totalPages);
+        
+        // Hide loading indicator BEFORE rendering (in case renderQuestionnaire has issues)
+        if (loadingDiv) {
+            loadingDiv.style.display = 'none';
+            console.log('Loading div hidden');
+        }
+        
+        // Clear progress interval
+        if (window._loadingProgressInterval) {
+            clearInterval(window._loadingProgressInterval);
+            window._loadingProgressInterval = null;
+        }
+        
+        // Render questionnaire
+        try {
+            renderQuestionnaire();
+            console.log('Questionnaire rendered successfully');
+        } catch (renderError) {
+            console.error('Error rendering questionnaire:', renderError);
+            if (loadingDiv) {
+                loadingDiv.style.display = 'block';
+                loadingDiv.innerHTML = `Error rendering questions: ${renderError.message}<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>`;
+            }
+        }
     } catch (error) {
         console.error('Error loading questions:', error);
         console.error('Error details:', {
@@ -324,6 +378,17 @@ async function loadQuestions(forceLoad = false) {
             } else {
                 loadingDiv.innerHTML = `Error loading questions: ${error.message}<br><br>Check the browser console (F12) for more details.<br><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>`;
             }
+        }
+    } finally {
+        // Always clear timeout
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        
+        // Always clear progress interval
+        if (window._loadingProgressInterval) {
+            clearInterval(window._loadingProgressInterval);
+            window._loadingProgressInterval = null;
         }
     }
 }
@@ -424,8 +489,8 @@ function renderQuestionnaire() {
     }, 1000);
 }
 
-// Format ChatGPT response text with proper formatting
-function formatChatGPTResponse(text) {
+// Format Claude response text with proper formatting
+function formatClaudeResponse(text) {
     if (!text) return '';
     
     // Escape HTML first to prevent XSS
@@ -482,7 +547,7 @@ function addBotMessage(text, isFormatted = true) {
     messageDiv.className = 'message message-bot';
     
     if (isFormatted) {
-        messageDiv.innerHTML = formatChatGPTResponse(text);
+        messageDiv.innerHTML = formatClaudeResponse(text);
     } else {
         messageDiv.textContent = text;
     }
@@ -592,13 +657,13 @@ function askNextQuestion() {
                 }, index * 300);
             });
             
-            // Show ChatGPT prompt response before input if configured
+            // Show Claude prompt response before input if configured
             const totalBubbleDelay = question.textBubbles.length * 300;
             if (question.chatPrompt && question.chatPrompt.trim()) {
-                // Get ChatGPT response before showing input
+                // Get Claude response before showing input
                 setTimeout(() => {
-                    getChatGPTResponseForQuestion(question, '').then(() => {
-                        // Show input after ChatGPT response
+                    getClaudeResponseForQuestion(question, '').then(() => {
+                        // Show input after Claude response
                         showQuestionInput(question);
                     });
                 }, totalBubbleDelay);
@@ -612,11 +677,11 @@ function askNextQuestion() {
             // Single bubble (default)
             addBotMessage(question.text + (question.required ? ' *' : ''));
             
-            // Show ChatGPT prompt response before input if configured
+            // Show Claude prompt response before input if configured
             if (question.chatPrompt && question.chatPrompt.trim()) {
-                // Get ChatGPT response before showing input
-                getChatGPTResponseForQuestion(question, '').then(() => {
-                    // Show input after ChatGPT response
+                // Get Claude response before showing input
+                getClaudeResponseForQuestion(question, '').then(() => {
+                    // Show input after Claude response
                     showQuestionInput(question);
                 });
             } else {
@@ -667,6 +732,55 @@ function filterQuestionsByConditions(allQuestions, responses) {
     });
 }
 
+// Filter post-college questions based on conditions
+// This checks both regular answers and post-college answers
+function filterPostCollegeQuestionsByConditions(allQuestions, regularResponses, postCollegeResponses) {
+    // Combine both response types for condition checking
+    const allResponses = { ...regularResponses };
+    if (postCollegeResponses) {
+        Object.assign(allResponses, postCollegeResponses);
+    }
+    
+    return allQuestions.filter(question => {
+        // If no condition, always show
+        if (!question.condition) {
+            return true;
+        }
+        
+        // Check condition
+        const { questionId, operator, value } = question.condition;
+        // Check both regular answers and post-college answers
+        const answer = allResponses[questionId];
+        
+        if (answer === undefined || answer === null || answer === '') {
+            return false;
+        }
+        
+        switch (operator) {
+            case 'equals':
+                return answer === value || (Array.isArray(answer) && answer.includes(value));
+            case 'notEquals':
+                return answer !== value && (!Array.isArray(answer) || !answer.includes(value));
+            case 'contains':
+                if (Array.isArray(answer)) {
+                    return answer.includes(value);
+                }
+                return String(answer).toLowerCase().includes(String(value).toLowerCase());
+            case 'notContains':
+                if (Array.isArray(answer)) {
+                    return !answer.includes(value);
+                }
+                return !String(answer).toLowerCase().includes(String(value).toLowerCase());
+            case 'greaterThan':
+                return Number(answer) > Number(value);
+            case 'lessThan':
+                return Number(answer) < Number(value);
+            default:
+                return true;
+        }
+    });
+}
+
 // Show input for the current question
 function showQuestionInput(question) {
     console.log('Showing input for question:', question);
@@ -681,9 +795,26 @@ function showQuestionInput(question) {
         return;
     }
     
+    // Check if this is a post-college question
+    const isPostCollegeQuestion = postCollegeQuestions.length > 0 && 
+        postCollegeQuestions.some(q => q.id === question.id);
+    
+    // Get saved answer if it exists
+    let savedAnswer = null;
+    if (isPostCollegeQuestion) {
+        savedAnswer = currentResponse.postCollegeAnswers && currentResponse.postCollegeAnswers[question.id];
+    } else {
+        savedAnswer = currentResponse[question.id];
+    }
+    
     chatInputArea.style.display = 'block';
     if (chatInput) {
-        chatInput.value = '';
+        // Pre-fill with saved answer if it exists
+        if (savedAnswer && (question.type === 'text' || question.type === 'email' || question.type === 'number' || question.type === 'textarea')) {
+            chatInput.value = Array.isArray(savedAnswer) ? savedAnswer.join(', ') : savedAnswer;
+        } else {
+            chatInput.value = '';
+        }
         chatInput.focus();
     }
     
@@ -710,6 +841,12 @@ function showQuestionInput(question) {
             const btn = document.createElement('button');
             btn.className = 'option-btn';
             btn.textContent = option;
+            
+            // Pre-select if this option matches the saved answer
+            if (savedAnswer === option) {
+                btn.classList.add('selected');
+            }
+            
                 btn.addEventListener('click', () => {
                 // Remove selected class from all buttons
                 optionsDiv.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
@@ -731,7 +868,7 @@ function showQuestionInput(question) {
                 }
                 addUserMessage(option);
                 
-                // Note: ChatGPT prompt response is now shown BEFORE the input, not after
+                // Note: Claude prompt response is now shown BEFORE the input, not after
                 // So we just move to next question
                 if (isPostCollegeQuestion) {
                     setTimeout(() => {
@@ -760,15 +897,28 @@ function showQuestionInput(question) {
         optionsDiv.className = 'option-buttons';
         
         const selectedOptions = [];
+        // Pre-populate selectedOptions with saved answer if it exists
+        if (savedAnswer && Array.isArray(savedAnswer)) {
+            selectedOptions.push(...savedAnswer);
+        }
+        
         question.options.forEach(option => {
             const btn = document.createElement('button');
             btn.className = 'option-btn';
             btn.textContent = option;
+            
+            // Pre-select if this option is in the saved answer
+            if (savedAnswer && Array.isArray(savedAnswer) && savedAnswer.includes(option)) {
+                btn.classList.add('selected');
+            }
+            
             btn.addEventListener('click', () => {
                 btn.classList.toggle('selected');
                 
                 if (btn.classList.contains('selected')) {
-                    selectedOptions.push(option);
+                    if (!selectedOptions.includes(option)) {
+                        selectedOptions.push(option);
+                    }
                 } else {
                     const index = selectedOptions.indexOf(option);
                     if (index > -1) selectedOptions.splice(index, 1);
@@ -802,7 +952,7 @@ function showQuestionInput(question) {
             }
             addUserMessage(selectedOptions.join(', '));
             
-            // Note: ChatGPT prompt response is now shown BEFORE the input, not after
+            // Note: Claude prompt response is now shown BEFORE the input, not after
             // So we just move to next question
             if (isPostCollegeQuestion) {
                 setTimeout(() => {
@@ -1085,8 +1235,6 @@ function handleSkipToQuestion(questionNumber) {
 async function handleSendMessage() {
     const message = chatInput.value.trim();
     
-    if (!message) return;
-    
     // Check for commands first (works in any mode - questionnaire, post-college questions, or chat mode)
     const goBackCommand = isGoBackCommand(message);
     if (goBackCommand !== null) {
@@ -1114,7 +1262,8 @@ async function handleSendMessage() {
             }
             
             // Now try to go back to the post-college question
-            if (handleGoBackToPostCollegeQuestion(questionNumber)) {
+            const result = await handleGoBackToPostCollegeQuestion(questionNumber);
+            if (result) {
                 chatInput.value = '';
                 return;
             } else {
@@ -1129,6 +1278,7 @@ async function handleSendMessage() {
                     isChatMode = false;
                 }
                 if (handleGoBackToQuestion(questionNumber)) {
+                    chatInput.value = '';
                     return;
                 }
             } else {
@@ -1143,8 +1293,8 @@ async function handleSendMessage() {
                             return;
                         }
                     } else {
-                        // Try one more time
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // Try one more time with a delay
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         await loadQuestions(true);
                         if (questions.length > 0) {
                             isChatMode = false;
@@ -1152,14 +1302,18 @@ async function handleSendMessage() {
                                 chatInput.value = '';
                                 return;
                             }
+                        } else {
+                            addBotMessage("No questions found. Please contact support or check the admin panel.");
+                            chatInput.value = '';
+                            return;
                         }
                     }
                 } catch (error) {
                     console.error('Error loading questions:', error);
+                    addBotMessage(`Error loading questions: ${error.message}. Please try again or contact support.`);
+                    chatInput.value = '';
+                    return;
                 }
-                addBotMessage("No regular questions are loaded. Please try again or contact support.");
-                chatInput.value = '';
-                return;
             }
         } else {
             // Auto-detect: try post-college first, then regular
@@ -1173,8 +1327,10 @@ async function handleSendMessage() {
                     const loaded = await loadPostCollegeQuestions();
                     // After loading, check if we have post-college questions now
                     if (loaded && postCollegeQuestions.length > 0) {
-                        if (handleGoBackToPostCollegeQuestion(questionNumber)) {
+                        const result = await handleGoBackToPostCollegeQuestion(questionNumber);
+                        if (result) {
                             handled = true;
+                            chatInput.value = '';
                             return;
                         }
                     }
@@ -1183,8 +1339,10 @@ async function handleSendMessage() {
                 }
             } else {
                 // Post-college questions are loaded, try to go back
-                if (handleGoBackToPostCollegeQuestion(questionNumber)) {
+                const result = await handleGoBackToPostCollegeQuestion(questionNumber);
+                if (result) {
                     handled = true;
+                    chatInput.value = '';
                     return;
                 }
             }
@@ -1203,34 +1361,31 @@ async function handleSendMessage() {
                             isChatMode = false;
                             if (handleGoBackToQuestion(questionNumber)) {
                                 handled = true;
+                                chatInput.value = '';
                                 return;
                             }
                         } else {
                             // Still no questions, try one more time with a delay
                             await new Promise(resolve => setTimeout(resolve, 500));
+                            await loadQuestions(true); // Force load again
                             if (questions.length > 0) {
                                 isChatMode = false;
                                 if (handleGoBackToQuestion(questionNumber)) {
                                     handled = true;
+                                    chatInput.value = '';
                                     return;
                                 }
+                            } else {
+                                addBotMessage('No questions found. Please contact support.');
+                                chatInput.value = '';
+                                return;
                             }
                         }
                     } catch (error) {
                         console.error('Error loading questions:', error);
-                        // Try one more time
-                        try {
-                            await loadQuestions(true);
-                            if (questions.length > 0) {
-                                isChatMode = false;
-                                if (handleGoBackToQuestion(questionNumber)) {
-                                    handled = true;
-                                    return;
-                                }
-                            }
-                        } catch (retryError) {
-                            console.error('Retry error loading questions:', retryError);
-                        }
+                        addBotMessage('Error loading questions. Please try again or contact support.');
+                        chatInput.value = '';
+                        return;
                     }
                 } else if (questions.length > 0) {
                     // Questions are loaded, but we might be in chat mode - reset it
@@ -1239,6 +1394,7 @@ async function handleSendMessage() {
                     }
                     if (handleGoBackToQuestion(questionNumber)) {
                         handled = true;
+                        chatInput.value = '';
                         return;
                     }
                 }
@@ -1449,15 +1605,17 @@ async function handleSendMessage() {
     
     // Check if we're in chat mode (after first response) or questionnaire mode
     // Note: Commands are already handled above, so if we reach here, it's not a command
-    if (isChatMode) {
-        // Chat mode: send to ChatGPT
-        sendChatMessage(message);
-    } else if (postCollegeQuestions.length > 0 && currentPostCollegeQuestionIndex < postCollegeQuestions.length) {
+    // IMPORTANT: Check post-college questions FIRST, before chat mode
+    // This ensures post-college questions are handled even if isChatMode is true
+    if (postCollegeQuestions.length > 0 && currentPostCollegeQuestionIndex < postCollegeQuestions.length) {
         // Post-college question mode: handle post-college question answer
         const question = postCollegeQuestions[currentPostCollegeQuestionIndex];
         
         // Handle the answer (optional questions can be skipped with empty message)
         handlePostCollegeQuestionAnswer(question, message);
+    } else if (isChatMode) {
+        // Chat mode: send to Claude
+        sendChatMessage(message);
     } else {
         
         // Questionnaire mode: handle question answer
@@ -1474,7 +1632,7 @@ async function handleSendMessage() {
             currentResponse[question.id] = message;
             addUserMessage(message);
             
-            // Note: ChatGPT prompt response is now shown BEFORE the input, not after
+            // Note: Claude prompt response is now shown BEFORE the input, not after
             // So we don't need to call it here anymore
             
             // Clear input and hide input area
@@ -1592,6 +1750,63 @@ async function fetchUserResponses() {
     return null;
 }
 
+// Load saved responses into currentResponse (including post-college answers)
+async function loadSavedResponsesIntoCurrentResponse() {
+    try {
+        const savedResponse = await fetchUserResponses();
+        console.log('Loading saved responses:', {
+            hasSavedResponse: !!savedResponse,
+            hasAnswers: savedResponse && !!savedResponse.answers,
+            answerKeys: savedResponse && savedResponse.answers ? Object.keys(savedResponse.answers) : [],
+            hasPostCollegeAnswers: savedResponse && savedResponse.answers && !!savedResponse.answers.postCollegeAnswers,
+            postCollegeAnswersKeys: savedResponse && savedResponse.answers && savedResponse.answers.postCollegeAnswers ? Object.keys(savedResponse.answers.postCollegeAnswers) : [],
+            fullResponseSample: savedResponse ? JSON.stringify(savedResponse).substring(0, 1000) : 'none',
+            answersStructure: savedResponse && savedResponse.answers ? {
+                hasPostCollegeAnswers: !!savedResponse.answers.postCollegeAnswers,
+                postCollegeAnswersType: savedResponse.answers.postCollegeAnswers ? typeof savedResponse.answers.postCollegeAnswers : 'none',
+                postCollegeAnswersIsArray: savedResponse.answers.postCollegeAnswers ? Array.isArray(savedResponse.answers.postCollegeAnswers) : false
+            } : 'no answers'
+        });
+        
+        if (savedResponse && savedResponse.answers) {
+            // Load regular answers
+            if (savedResponse.answers) {
+                // Separate post-college answers from regular answers
+                if (savedResponse.answers.postCollegeAnswers) {
+                    // Deep copy post-college answers
+                    currentResponse.postCollegeAnswers = { ...savedResponse.answers.postCollegeAnswers };
+                    console.log('Loaded post-college answers:', Object.keys(currentResponse.postCollegeAnswers));
+                    
+                    // Copy regular answers (excluding postCollegeAnswers)
+                    Object.keys(savedResponse.answers).forEach(key => {
+                        if (key !== 'postCollegeAnswers') {
+                            currentResponse[key] = savedResponse.answers[key];
+                        }
+                    });
+                } else {
+                    // No post-college answers, just copy all answers
+                    Object.assign(currentResponse, savedResponse.answers);
+                    // Initialize empty post-college answers if they don't exist
+                    if (!currentResponse.postCollegeAnswers) {
+                        currentResponse.postCollegeAnswers = {};
+                    }
+                }
+            }
+            
+            console.log('Loaded into currentResponse:', {
+                regularKeys: Object.keys(currentResponse).filter(k => k !== 'postCollegeAnswers'),
+                postCollegeKeys: currentResponse.postCollegeAnswers ? Object.keys(currentResponse.postCollegeAnswers) : [],
+                postCollegeAnswersCount: currentResponse.postCollegeAnswers ? Object.keys(currentResponse.postCollegeAnswers).length : 0
+            });
+            
+            return true;
+        }
+    } catch (error) {
+        console.error('Error loading saved responses:', error);
+    }
+    return false;
+}
+
 // Render chat mode (after first response)
 async function renderChatMode() {
     console.log('Rendering chat mode...');
@@ -1650,8 +1865,8 @@ async function renderChatMode() {
     }
 }
 
-// Get ChatGPT response for a specific question after it's answered
-async function getChatGPTResponseForQuestion(question, answer) {
+// Get Claude response for a specific question after it's answered
+async function getClaudeResponseForQuestion(question, answer) {
     if (!question.chatPrompt || !question.chatPrompt.trim()) {
         return;
     }
@@ -1717,7 +1932,7 @@ async function getChatGPTResponseForQuestion(question, answer) {
             formattedPrompt = formattedPrompt.replace(/{allAnswers}/g, allAnswersText);
         }
         
-        // Send to ChatGPT with all previous answers
+        // Send to Claude with all previous answers
         const response = await fetch(`${API_BASE}/chat/question`, {
             method: 'POST',
             headers: {
@@ -1736,18 +1951,21 @@ async function getChatGPTResponseForQuestion(question, answer) {
         removeTypingIndicator();
         
         if (!response.ok) {
-            console.error('Error getting ChatGPT response for question');
+            console.error('Error getting Claude response for question');
             return;
         }
         
         const data = await response.json();
         
         if (data.success && data.message) {
-            // Add ChatGPT response as a separate bot message
             addBotMessage(data.message);
+            // Add admin-configured text after Claude output
+            if (question.textAfterClaude && question.textAfterClaude.trim()) {
+                addBotMessage(question.textAfterClaude.trim(), true);
+            }
         }
     } catch (error) {
-        console.error('Error getting ChatGPT response for question:', error);
+        console.error('Error getting Claude response for question:', error);
         removeTypingIndicator();
     }
 }
@@ -1835,6 +2053,9 @@ async function loadPostCollegeQuestions() {
 // Load and display post-college questions
 async function loadAndDisplayPostCollegeMessages() {
     try {
+        // Load saved responses from database first
+        await loadSavedResponsesIntoCurrentResponse();
+        
         const response = await fetch(`${API_BASE}/post-college-messages`, {
             credentials: 'include'
         });
@@ -1856,6 +2077,8 @@ async function loadAndDisplayPostCollegeMessages() {
             currentPostCollegeQuestionIndex = 0;
             
             if (postCollegeQuestions.length > 0) {
+                // Reset chat mode to ensure post-college questions are handled correctly
+                isChatMode = false;
                 // Start asking post-college questions
                 askNextPostCollegeQuestion();
             } else {
@@ -1970,12 +2193,17 @@ async function showFinalMessageAndTransitionToChat() {
     }
 }
 
-// Transition to chat mode (direct ChatGPT access)
+// Transition to chat mode (direct Claude access)
 function transitionToChatMode() {
+    // Save post-college answers before transitioning to chat mode
+    if (currentResponse.postCollegeAnswers && Object.keys(currentResponse.postCollegeAnswers).length > 0) {
+        savePostCollegeAnswersToDatabase();
+    }
+    
     // Ensure we're in chat mode
     isChatMode = true;
     
-    // Show input area for direct ChatGPT chat
+    // Show input area for direct Claude chat
     if (chatInputArea) {
         chatInputArea.style.display = 'block';
     }
@@ -2005,7 +2233,10 @@ function transitionToChatMode() {
 }
 
 // Handle go back to post-college question (clears answers after that question)
-function handleGoBackToPostCollegeQuestion(questionNumber) {
+async function handleGoBackToPostCollegeQuestion(questionNumber) {
+    // Load saved responses from database first
+    await loadSavedResponsesIntoCurrentResponse();
+    
     // Convert to 0-based index (question numbers are 1-based)
     const targetIndex = questionNumber - 1;
     
@@ -2013,6 +2244,15 @@ function handleGoBackToPostCollegeQuestion(questionNumber) {
     if (targetIndex < 0 || targetIndex >= postCollegeQuestions.length) {
         addBotMessage(`Post-college question ${questionNumber} doesn't exist. There are ${postCollegeQuestions.length} post-college questions total.`);
         return false;
+    }
+    
+    // Clear the answer for the target question (so user can answer it fresh)
+    const targetQuestion = postCollegeQuestions[targetIndex];
+    const targetQuestionId = targetQuestion.id;
+    let clearedTargetAnswer = false;
+    if (currentResponse.postCollegeAnswers && currentResponse.postCollegeAnswers[targetQuestionId] !== undefined) {
+        delete currentResponse.postCollegeAnswers[targetQuestionId];
+        clearedTargetAnswer = true;
     }
     
     // Clear all answers after the target question
@@ -2025,6 +2265,9 @@ function handleGoBackToPostCollegeQuestion(questionNumber) {
         }
     }
     
+    // IMPORTANT: Keep all answers from questions BEFORE the target question
+    // These should remain in currentResponse.postCollegeAnswers for Claude context
+    
     // Set current index to target
     currentPostCollegeQuestionIndex = targetIndex;
     
@@ -2032,16 +2275,37 @@ function handleGoBackToPostCollegeQuestion(questionNumber) {
     chatInput.value = '';
     chatInputArea.style.display = 'none';
     
-    if (answersToClear.length > 0) {
-        addBotMessage(`Going back to post-college question ${questionNumber}. Cleared answers for ${answersToClear.length} question(s) after question ${questionNumber}.`);
+    // Build message about what was cleared
+    let clearMessage = '';
+    if (clearedTargetAnswer && answersToClear.length > 0) {
+        clearMessage = `Going back to post-college question ${questionNumber}. Cleared answer for question ${questionNumber} and ${answersToClear.length} question(s) after it.`;
+    } else if (clearedTargetAnswer) {
+        clearMessage = `Going back to post-college question ${questionNumber}. Cleared answer for question ${questionNumber}.`;
+    } else if (answersToClear.length > 0) {
+        clearMessage = `Going back to post-college question ${questionNumber}. Cleared answers for ${answersToClear.length} question(s) after question ${questionNumber}.`;
     } else {
-        addBotMessage(`Going back to post-college question ${questionNumber}.`);
+        clearMessage = `Going back to post-college question ${questionNumber}.`;
     }
     
-    // Ask the target question
+    addBotMessage(clearMessage);
+    
+    // Save the cleared answers to database immediately
+    if (clearedTargetAnswer || answersToClear.length > 0) {
+        savePostCollegeAnswersToDatabase();
+    }
+    
+    // Debug: Log loaded responses
+    console.log('After loading responses when going back:', {
+        hasRegularAnswers: Object.keys(currentResponse).filter(k => k !== 'postCollegeAnswers').length,
+        hasPostCollegeAnswers: currentResponse.postCollegeAnswers ? Object.keys(currentResponse.postCollegeAnswers).length : 0,
+        targetQuestionId: targetQuestion.id,
+        targetAnswerCleared: clearedTargetAnswer
+    });
+    
+    // Ask the target question (give a bit more time to ensure responses are loaded and saved)
     setTimeout(() => {
         askNextPostCollegeQuestion();
-    }, 500);
+    }, 800);
     
     return true;
 }
@@ -2076,13 +2340,47 @@ function handleSkipToPostCollegeQuestion(questionNumber) {
 
 // Ask next post-college question
 function askNextPostCollegeQuestion() {
-    if (currentPostCollegeQuestionIndex >= postCollegeQuestions.length) {
-        // All questions answered, show final message if configured, then transition to chat mode
+    // Filter questions based on conditions
+    const availableQuestions = filterPostCollegeQuestionsByConditions(
+        postCollegeQuestions, 
+        currentResponse, 
+        currentResponse.postCollegeAnswers
+    );
+    
+    // If no questions are available, check if we've answered all questions
+    if (availableQuestions.length === 0) {
+        // No questions meet conditions, show final message and transition to chat
         showFinalMessageAndTransitionToChat();
         return;
     }
     
-    const question = postCollegeQuestions[currentPostCollegeQuestionIndex];
+    // Find the next unanswered question - iterate over ORIGINAL order to avoid skipping
+    // (e.g. using availableQuestions index could skip q2 and jump to q3)
+    let nextQuestion = null;
+    let foundIndex = -1;
+    const availableIds = new Set(availableQuestions.map(aq => aq.id));
+    
+    for (let i = currentPostCollegeQuestionIndex; i < postCollegeQuestions.length; i++) {
+        const q = postCollegeQuestions[i];
+        if (!availableIds.has(q.id)) continue; // Filtered by conditions
+        const isAnswered = currentResponse.postCollegeAnswers && 
+                           currentResponse.postCollegeAnswers[q.id] !== undefined;
+        if (!isAnswered || q.noInput) {
+            nextQuestion = q;
+            foundIndex = i;
+            break;
+        }
+    }
+    
+    // If no next question found, we're done
+    if (!nextQuestion) {
+        showFinalMessageAndTransitionToChat();
+        return;
+    }
+    
+    // Update current index to the found question's index in the original array
+    currentPostCollegeQuestionIndex = foundIndex;
+    const question = nextQuestion;
     
     // Always show question text first (if it exists)
     if (question.text && question.text.trim()) {
@@ -2112,10 +2410,9 @@ function askNextPostCollegeQuestion() {
         if (question.noInput) {
             // Auto-advance after displaying all bubbles
             setTimeout(() => {
-                // Get ChatGPT response if prompt is configured
-                if (question.chatPrompt && question.chatPrompt.trim()) {
-                    getChatGPTResponseForPostCollegeQuestion(question, '').then(() => {
-                        // Move to next question after ChatGPT response
+                // Get Claude response if prompt or college details flow is configured
+                if ((question.chatPrompt && question.chatPrompt.trim()) || question.collegeDetailsFlow) {
+                    getClaudeResponseForPostCollegeQuestion(question, '').then(() => {
                         currentPostCollegeQuestionIndex++;
                         askNextPostCollegeQuestion();
                     });
@@ -2126,12 +2423,12 @@ function askNextPostCollegeQuestion() {
                 }
             }, delayAfterQuestion + question.textBubbles.length * 500 + 1000);
         } else {
-            // Show ChatGPT prompt response before input if configured
+            // Show Claude prompt response before input if configured
             const totalDelay = delayAfterQuestion + question.textBubbles.length * 500;
-            if (question.chatPrompt && question.chatPrompt.trim()) {
+            if ((question.chatPrompt && question.chatPrompt.trim()) || question.collegeDetailsFlow) {
                 setTimeout(() => {
-                    getChatGPTResponseForPostCollegeQuestion(question, '').then(() => {
-                        // Show input after ChatGPT response
+                    getClaudeResponseForPostCollegeQuestion(question, '').then(() => {
+                        // Show input after Claude response
                         showQuestionInput(question);
                     });
                 }, totalDelay);
@@ -2147,10 +2444,9 @@ function askNextPostCollegeQuestion() {
         if (question.noInput) {
             // Auto-advance after displaying message
             setTimeout(() => {
-                // Get ChatGPT response if prompt is configured
-                if (question.chatPrompt && question.chatPrompt.trim()) {
-                    getChatGPTResponseForPostCollegeQuestion(question, '').then(() => {
-                        // Move to next question after ChatGPT response
+                // Get Claude response if prompt or college details flow is configured
+                if ((question.chatPrompt && question.chatPrompt.trim()) || question.collegeDetailsFlow) {
+                    getClaudeResponseForPostCollegeQuestion(question, '').then(() => {
                         currentPostCollegeQuestionIndex++;
                         askNextPostCollegeQuestion();
                     });
@@ -2161,11 +2457,11 @@ function askNextPostCollegeQuestion() {
                 }
             }, 1000);
         } else {
-            // Show ChatGPT prompt response before input if configured
-            if (question.chatPrompt && question.chatPrompt.trim()) {
+            // Show Claude prompt response before input if configured
+            if ((question.chatPrompt && question.chatPrompt.trim()) || question.collegeDetailsFlow) {
                 setTimeout(() => {
-                    getChatGPTResponseForPostCollegeQuestion(question, '').then(() => {
-                        // Show input after ChatGPT response
+                    getClaudeResponseForPostCollegeQuestion(question, '').then(() => {
+                        // Show input after Claude response
                         showQuestionInput(question);
                     });
                 }, 500);
@@ -2187,6 +2483,9 @@ function handlePostCollegeQuestionAnswer(question, answer) {
         }
         currentResponse.postCollegeAnswers[question.id] = answer;
         addUserMessage(answer);
+        
+        // Save post-college answers to database immediately
+        savePostCollegeAnswersToDatabase();
     } else if (!question.required) {
         // Optional question with no answer - skip it
         addUserMessage('(skipped)');
@@ -2198,7 +2497,7 @@ function handlePostCollegeQuestionAnswer(question, answer) {
     // Clear input
     if (chatInput) chatInput.value = '';
     
-    // Note: ChatGPT prompt response is now shown BEFORE the input, not after
+    // Note: Claude prompt response is now shown BEFORE the input, not after
     // So we just move to next question
     setTimeout(() => {
         currentPostCollegeQuestionIndex++;
@@ -2207,15 +2506,109 @@ function handlePostCollegeQuestionAnswer(question, answer) {
     }, 500);
 }
 
-// Get ChatGPT response for post-college question
-async function getChatGPTResponseForPostCollegeQuestion(question, answer) {
-    if (!question.chatPrompt || !question.chatPrompt.trim()) {
+// Save post-college answers to database by updating the existing response
+async function savePostCollegeAnswersToDatabase() {
+    try {
+        // Get the current saved response
+        const savedResponse = await fetchUserResponses();
+        if (!savedResponse || !savedResponse.id) {
+            console.log('No saved response found to update with post-college answers');
+            return;
+        }
+        
+        // Ensure we have post-college answers to save
+        if (!currentResponse.postCollegeAnswers || Object.keys(currentResponse.postCollegeAnswers).length === 0) {
+            console.log('No post-college answers to save');
+            return;
+        }
+        
+        // Merge with existing answers, preserving all regular answers and existing post-college answers
+        const updatedAnswers = {
+            ...(savedResponse.answers || {}),
+            postCollegeAnswers: {
+                ...(savedResponse.answers && savedResponse.answers.postCollegeAnswers ? savedResponse.answers.postCollegeAnswers : {}),
+                ...currentResponse.postCollegeAnswers
+            }
+        };
+        
+        // Update the response with post-college answers
+        const updateData = {
+            answers: updatedAnswers
+        };
+        
+        console.log('Saving post-college answers:', {
+            responseId: savedResponse.id,
+            postCollegeAnswersCount: Object.keys(currentResponse.postCollegeAnswers).length,
+            postCollegeAnswersKeys: Object.keys(currentResponse.postCollegeAnswers),
+            existingPostCollegeCount: savedResponse.answers && savedResponse.answers.postCollegeAnswers ? Object.keys(savedResponse.answers.postCollegeAnswers).length : 0
+        });
+        
+        const response = await fetch(`${API_BASE}/responses/${savedResponse.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(updateData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Post-college answers saved to database successfully');
+        } else {
+            const errorText = await response.text();
+            console.error('Failed to save post-college answers to database:', response.status, errorText);
+        }
+    } catch (error) {
+        console.error('Error saving post-college answers to database:', error);
+    }
+}
+
+// Get Claude response for post-college question
+async function getClaudeResponseForPostCollegeQuestion(question, answer) {
+    // College details flow works without chatPrompt (uses default); regular flow needs chatPrompt
+    const useCollegeDetailsFlow = question.collegeDetailsFlow === true;
+    if (!useCollegeDetailsFlow && (!question.chatPrompt || !question.chatPrompt.trim())) {
         return Promise.resolve();
     }
     
     showTypingIndicator();
     
     try {
+        // College list + details flow: call dedicated endpoint
+        if (useCollegeDetailsFlow) {
+            const allAnswersForChat = { ...currentResponse };
+            if (currentResponse.postCollegeAnswers) {
+                allAnswersForChat.postCollegeAnswers = currentResponse.postCollegeAnswers;
+            }
+            const listPrompt = question.chatPrompt && question.chatPrompt.trim() ? question.chatPrompt : '';
+            const response = await fetch(`${API_BASE}/chat/colleges-detailed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    allAnswers: allAnswersForChat,
+                    listPrompt: listPrompt
+                })
+            });
+            removeTypingIndicator();
+            if (!response.ok) {
+                console.error('Error getting college list + details');
+                return Promise.resolve();
+            }
+            const data = await response.json();
+            if (data.success && data.message) {
+                addBotMessage(data.message);
+                conversationHistory.push({ role: 'assistant', content: data.message });
+                // Add admin-configured text after Claude output
+                if (question.textAfterClaude && question.textAfterClaude.trim()) {
+                    addBotMessage(question.textAfterClaude.trim(), true);
+                    conversationHistory.push({ role: 'assistant', content: question.textAfterClaude.trim() });
+                }
+            }
+            return Promise.resolve();
+        }
+        
         // Format the prompt with the answer (empty string if before answer)
         let formattedPrompt = question.chatPrompt.replace(/{answer}/g, answer || '');
         
@@ -2261,23 +2654,78 @@ async function getChatGPTResponseForPostCollegeQuestion(question, answer) {
             });
             
             // Replace {allAnswers} with all previous answers (including questionnaire answers)
-            const allAnswersText = Object.entries(currentResponse)
+            // NOTE: Client-side replacement is just a preview - server will do the full formatting
+            // But we still do it here so the prompt looks complete
+            // Include both regular answers and post-college answers
+            const regularAnswersText = Object.entries(currentResponse)
                 .filter(([key]) => key !== 'postCollegeAnswers')
                 .map(([qId, ans]) => {
+                    // Try to find question text, but if questions aren't loaded, use question ID
                     const q = questions.find(q => q.id === qId);
-                    const qText = q ? q.text : qId;
-                    const answerText = Array.isArray(ans) ? ans.join(', ') : ans;
+                    const qText = q ? q.text : `Question ${qId}`;
+                    const answerText = Array.isArray(ans) ? ans.join(', ') : String(ans || '');
+                    if (!answerText || answerText.trim() === '') return null;
                     return `${qText}: ${answerText}`;
                 })
+                .filter(text => text && text.trim())
                 .join('\n');
             
-            formattedPrompt = formattedPrompt.replace(/{allAnswers}/g, allAnswersText);
+            const postCollegeAnswersText = currentResponse.postCollegeAnswers ? 
+                Object.entries(currentResponse.postCollegeAnswers)
+                    .map(([qId, ans]) => {
+                        // Try to find question text, but if post-college questions aren't loaded, use question ID
+                        const q = postCollegeQuestions.find(q => q.id === qId);
+                        const qText = q ? q.text : `Post-college Question ${qId}`;
+                        const answerText = Array.isArray(ans) ? ans.join(', ') : String(ans || '');
+                        if (!answerText || answerText.trim() === '') return null;
+                        return `${qText}: ${answerText}`;
+                    })
+                    .filter(text => text && text.trim())
+                    .join('\n') : '';
+            
+            // Combine both
+            let allAnswersText = '';
+            if (regularAnswersText) {
+                allAnswersText += 'Regular questionnaire answers:\n' + regularAnswersText;
+            }
+            if (postCollegeAnswersText) {
+                if (allAnswersText) allAnswersText += '\n\n';
+                allAnswersText += 'Post-college question answers:\n' + postCollegeAnswersText;
+            }
+            
+            console.log('Client-side allAnswers replacement:', {
+                questionsLoaded: questions.length,
+                postCollegeQuestionsLoaded: postCollegeQuestions.length,
+                regularAnswersCount: regularAnswersText ? regularAnswersText.split('\n').length : 0,
+                postCollegeAnswersCount: postCollegeAnswersText ? postCollegeAnswersText.split('\n').length : 0,
+                totalLength: allAnswersText.length,
+                sample: allAnswersText.substring(0, 500)
+            });
+            
+            // Replace {allAnswers} placeholder - but server will also add formatted context
+            formattedPrompt = formattedPrompt.replace(/{allAnswers}/g, allAnswersText || 'User information will be provided by the system.');
         }
         
         // Handle RAG if enabled (RAG is handled server-side)
         formattedPrompt = formattedPrompt.replace(/{ragResults}/g, '');
         
-        // Send to ChatGPT (server will handle RAG if enabled)
+        // Prepare allAnswers including both regular and post-college answers
+        // Make sure we include all saved responses, not just current session
+        const allAnswersForChat = { ...currentResponse };
+        // Ensure post-college answers are included
+        if (currentResponse.postCollegeAnswers) {
+            allAnswersForChat.postCollegeAnswers = currentResponse.postCollegeAnswers;
+        }
+        
+        // Debug: Log what we're sending
+        console.log('Sending to Claude:', {
+            questionId: question.id,
+            hasRegularAnswers: Object.keys(currentResponse).filter(k => k !== 'postCollegeAnswers').length,
+            hasPostCollegeAnswers: currentResponse.postCollegeAnswers ? Object.keys(currentResponse.postCollegeAnswers).length : 0,
+            allAnswersKeys: Object.keys(allAnswersForChat)
+        });
+        
+        // Send to Claude (server will handle RAG if enabled)
         const response = await fetch(`${API_BASE}/chat/question`, {
             method: 'POST',
             headers: {
@@ -2288,7 +2736,7 @@ async function getChatGPTResponseForPostCollegeQuestion(question, answer) {
                 questionId: question.id,
                 questionText: question.text,
                 answer: answer,
-                allAnswers: currentResponse,
+                allAnswers: allAnswersForChat,
                 prompt: formattedPrompt,
                 useRAG: question.useRAG || false,
                 ragQuery: question.ragQuery || ''
@@ -2298,32 +2746,40 @@ async function getChatGPTResponseForPostCollegeQuestion(question, answer) {
         removeTypingIndicator();
         
         if (!response.ok) {
-            console.error('Error getting ChatGPT response for post-college question');
+            const errData = await response.json().catch(() => ({}));
+            addBotMessage(`Sorry, I couldn't get a response. ${errData.message || 'Please try again.'}`);
             return Promise.resolve();
         }
         
         const data = await response.json();
         
         if (data.success && data.message) {
-            // Add ChatGPT response as a separate bot message
             addBotMessage(data.message);
             conversationHistory.push({
                 role: 'assistant',
                 content: data.message
             });
+            // Add admin-configured text after Claude output
+            if (question.textAfterClaude && question.textAfterClaude.trim()) {
+                addBotMessage(question.textAfterClaude.trim(), true);
+                conversationHistory.push({ role: 'assistant', content: question.textAfterClaude.trim() });
+            }
+        } else {
+            addBotMessage(`Sorry, I couldn't get a response. ${data.message || 'Please try again.'}`);
         }
         
         return Promise.resolve();
     } catch (error) {
-        console.error('Error getting ChatGPT response for post-college question:', error);
+        console.error('Error getting response for post-college question:', error);
         removeTypingIndicator();
+        addBotMessage('Sorry, I encountered an error. Please try again.');
         return Promise.resolve();
     }
 }
 
 // Show chat input after college recommendations with a prompt
 function showPostCollegeChatInput(promptMessage) {
-    // Ensure we're in chat mode so messages are sent to ChatGPT
+    // Ensure we're in chat mode so messages are sent to Claude
     isChatMode = true;
     
     // Use the provided prompt message or default
@@ -2422,7 +2878,7 @@ async function getCollegeRecommendations(responseData) {
     }
 }
 
-// Send message to ChatGPT
+// Send message to Claude
 async function sendChatMessage(message) {
     if (!message.trim()) return;
     
@@ -2450,7 +2906,7 @@ async function sendChatMessage(message) {
             await fetchUserResponses();
         }
         
-        // Send to ChatGPT API
+        // Send to Claude API
         const response = await fetch(`${API_BASE}/chat`, {
             method: 'POST',
             headers: {

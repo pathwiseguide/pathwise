@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test ChatGPT Prompt - Pathwise</title>
+    <title>Test Claude Prompt - Pathwise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         .admin-container {
@@ -163,9 +163,8 @@
 <body>
     <div class="container">
         <nav class="nav-header">
-            <div class="logo">Pathwise</div>
+            <a href="/" class="logo">Pathwise</a>
             <div class="nav-links">
-                <a href="/">Home</a>
                 <a href="/admin.html">Edit Questions</a>
                 <a href="/documents.html">Documents</a>
                 <a href="/test-prompt.html">Test Prompt</a>
@@ -174,8 +173,8 @@
 
         <div class="admin-container">
             <div class="admin-header">
-                <h1>Test ChatGPT Prompt</h1>
-                <p>Test what ChatGPT will output for any prompt. Useful for testing question prompts before using them.</p>
+                <h1>Test Claude Prompt</h1>
+                <p>Test what Claude will output for any prompt. Useful for testing question prompts before using them.</p>
             </div>
 
             <div id="message" class="message"></div>
@@ -213,10 +212,10 @@
             <button class="btn" onclick="testPrompt()">Test Prompt</button>
             <button class="btn" onclick="clearResponse()" style="background: #6c757d;">Clear</button>
 
-            <div class="loading" id="loading">Testing prompt with ChatGPT...</div>
+            <div class="loading" id="loading">Testing prompt with Claude...</div>
 
             <div class="response-section" id="responseSection" style="display: none;">
-                <h2>ChatGPT Response</h2>
+                <h2>Claude Response</h2>
                 <div class="response-content" id="responseContent"></div>
             </div>
         </div>
@@ -316,5 +315,7 @@
     </script>
 </body>
 </html>
+
+
 
 
