@@ -214,7 +214,7 @@ If you want to test on Fly **without** real money first, you can use your **test
    fly secrets set STRIPE_SECRET_KEY="your_stripe_secret_key_here"
    ```
 
-   Replace `sk_live_...` with your actual key. Use quotes so the shell doesn’t break on special characters.
+   Replace the placeholder with your actual Stripe secret key from the Dashboard. Use quotes so the shell doesn’t break on special characters.
 
 3. Set the public URL of your app (no trailing slash):
 
