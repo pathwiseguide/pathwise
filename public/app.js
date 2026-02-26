@@ -2827,28 +2827,23 @@ function showPostCollegeChatInput(promptMessage) {
 // Get college recommendations automatically after submission
 async function getCollegeRecommendations(responseData) {
     showTypingIndicator();
-    
+    const controller = new AbortController();
+    let timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
-        // Send request to get college recommendations
         const response = await fetch(`${API_BASE}/chat/colleges`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({
-                responseData: responseData
-            })
+            body: JSON.stringify({ responseData: responseData }),
+            signal: controller.signal
         });
-        
+        clearTimeout(timeoutId);
         removeTypingIndicator();
-        
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-            addBotMessage(`Sorry, I encountered an error getting college recommendations: ${errorData.message || 'Please try again later.'}`);
+            addBotMessage(`Sorry, I encountered an error getting college recommendations: ${errorData.message || 'AI is not available. Add ANTHROPIC_API_KEY to .env and restart the server.'}`);
             return;
         }
-        
         const data = await response.json();
         
         if (data.success) {
@@ -2872,9 +2867,11 @@ async function getCollegeRecommendations(responseData) {
             addBotMessage(`Sorry, I couldn't get college recommendations. ${data.message || 'Please try again.'}`);
         }
     } catch (error) {
-        console.error('Error getting college recommendations:', error);
+        clearTimeout(timeoutId);
         removeTypingIndicator();
-        addBotMessage('Sorry, I encountered a network error getting college recommendations. Please check your connection and try again.');
+        const msg = error.name === 'AbortError' ? 'Request timed out. If AI is not configured, add ANTHROPIC_API_KEY to .env and restart the server.' : (error.message || 'Please check your connection and try again.');
+        addBotMessage('Sorry, I couldn\'t get college recommendations. ' + msg);
+        console.error('Error getting college recommendations:', error);
     }
 }
 
@@ -3203,11 +3200,12 @@ async function submitResponse() {
         removeTypingIndicator();
         addBotMessage('Thank you for your responses! Submitting now...');
         
-        // Prepare response data
+        // Prepare response data (initial diagnostic = Module 0 so college recommendations use this)
         const responseData = {
             questions: questions,
             answers: currentResponse,
-            submittedAt: new Date().toISOString()
+            submittedAt: new Date().toISOString(),
+            moduleId: 'module-0'
         };
         
         // Store responseData for later use

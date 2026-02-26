@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - Pathwise</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .make-account-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
+            max-width: 480px;
+            margin: 60px auto;
+            text-align: center;
+        }
+        .make-account-box h1 { margin-bottom: 12px; color: #333; }
+        .make-account-box p { color: #666; margin-bottom: 24px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-header">
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
+            <div class="nav-links">
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink">Pricing</a>
+                <a href="/login.html" id="loginLink">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </nav>
+        <div class="make-account-box">
+            <h1>Create an account to see your results</h1>
+            <p>Your Initial Diagnostic answers are saved. Sign up to view your personalized plan and continue.</p>
+            <a href="/login.html?show=register&return=payment" class="btn-primary" style="display: inline-block; padding: 14px 32px;">Sign Up</a>
+        </div>
+    </div>
+    <script>
+        // If user is already logged in, redirect to payment
+        fetch('/api/auth/check', { credentials: 'include' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.authenticated) {
+                    const urlParams = new URLSearchParams(location.search);
+                    const ret = urlParams.get('return') || '/modules';
+                    location.href = ret;
+                }
+            });
+    </script>
+    <script src="/nav-modules.js"></script>
+</body>
+</html>

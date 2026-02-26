@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pathwise - Login</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
     </style>
 </head>
@@ -12,11 +12,16 @@
     <div class="container">
         <!-- Navigation Header -->
         <nav class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
-                <a href="/payment" id="plansLink" style="display: block;">Plans</a>
-                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
-                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink" style="display: block;">Pricing</a>
                 <a href="/login.html" id="loginLink" class="auth-button">Login</a>
                 <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
             </div>
@@ -64,7 +69,8 @@
                 
                 <div id="registerForm" class="auth-form" style="display: none;">
                     <h2>Create Account</h2>
-                    <p class="subtitle">Join Pathwise today</p>
+                    <p class="subtitle" id="registerSubtitle">Join Pathwise today</p>
+                    <p class="subtitle" id="signupResultsMsg" style="display: none;">Sign up to see your results now.</p>
                     
                     <div id="registerErrorMessage" class="error-message" style="display: none;"></div>
                     <div id="registerSuccessMessage" class="success-message" style="display: none;"></div>
@@ -167,7 +173,6 @@
                 
                 const loginLink = document.getElementById('loginLink');
                 const logoutButton = document.getElementById('logoutButton');
-                const counselorLink = document.getElementById('counselorLink');
                 
                 if (data.authenticated) {
                     // User is logged in - show logout, hide login
@@ -179,20 +184,11 @@
                     if (logoutButton) logoutButton.style.display = 'none';
                 }
                 
-                // Show Counselor button and hide Plans link if payment completed
+                // Show Plans when logged in so user can switch plans
                 const plansLink = document.getElementById('plansLink');
-                const responsesLink = document.getElementById('responsesLink');
-                if (counselorLink && plansLink) {
+                if (plansLink) {
                     const hasAccess = await hasPaymentAccess();
-                    if (hasAccess) {
-                        counselorLink.style.display = 'block';
-                        plansLink.style.display = 'none';
-                        if (responsesLink) responsesLink.style.display = 'block';
-                    } else {
-                        counselorLink.style.display = 'none';
-                        plansLink.style.display = 'block';
-                        if (responsesLink) responsesLink.style.display = 'none';
-                    }
+                    plansLink.style.display = (data.authenticated || !hasAccess) ? 'block' : 'none';
                 }
             } catch (error) {
                 console.error('Auth check error:', error);
@@ -232,6 +228,8 @@
             }
         });
     </script>
+    <script src="/nav-modules.js"></script>
+    <script src="/chat-widget.js"></script>
 </body>
 </html>
 

@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complete Payment - Pathwise</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
         .payment-process-container {
             background: white;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
             max-width: 600px;
             margin: 0 auto;
         }
@@ -74,8 +74,8 @@
         .form-group select {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            border-radius: 10px;
             font-size: 1rem;
             transition: border-color 0.3s;
         }
@@ -83,7 +83,7 @@
         .form-group input:focus,
         .form-group select:focus {
             outline: none;
-            border-color: #555;
+            border-color: #4285F4;
         }
 
         .form-row {
@@ -95,42 +95,49 @@
         .payment-actions {
             display: flex;
             justify-content: space-between;
+            align-items: stretch;
             gap: 20px;
             margin-top: 30px;
         }
 
-        .btn-primary {
-            background: #555;
-            color: white;
-            border: none;
-            padding: 15px 40px;
+        .payment-actions .btn-primary,
+        .payment-actions .btn-secondary {
+            box-sizing: border-box;
+            height: 48px;
+            min-height: 48px;
+            padding: 0 32px;
+            margin: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border-radius: 8px;
             font-size: 1.1rem;
             font-weight: 600;
+            line-height: 1;
             cursor: pointer;
             transition: all 0.3s;
+        }
+
+        .payment-actions .btn-primary {
+            background: #4285F4;
+            color: white;
+            border: none;
             flex: 1;
         }
 
-        .btn-primary:hover {
-            background: #444;
+        .payment-actions .btn-primary:hover {
+            background: #3367d6;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
-        .btn-secondary {
+        .payment-actions .btn-secondary {
             background: white;
             color: #333;
             border: 2px solid #555;
-            padding: 15px 40px;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
         }
 
-        .btn-secondary:hover {
+        .payment-actions .btn-secondary:hover {
             background: #f0f0f0;
         }
 
@@ -148,8 +155,8 @@
             display: none;
             text-align: center;
             padding: 30px;
-            background: #f0f0f0;
-            border: 2px solid #e0e0e0;
+            background: rgba(66, 133, 244, 0.06);
+            border: 1px solid rgba(66, 133, 244, 0.2);
             border-radius: 8px;
             color: #333;
             margin-top: 20px;
@@ -165,11 +172,16 @@
     <div class="container">
         <!-- Navigation Header -->
         <nav class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
-                <a href="/payment" id="plansLink" style="display: block;">Plans</a>
-                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
-                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink" style="display: block;">Pricing</a>
                 <a href="/login.html" id="loginLink" class="auth-button">Login</a>
                 <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
             </div>
@@ -190,10 +202,23 @@
                     <span>Amount:</span>
                     <span id="planPrice">$100.00</span>
                 </div>
+                <div id="codeSummaryRow" class="summary-item" style="display: none;">
+                    <span>Code:</span>
+                    <span id="codeSummaryText"></span>
+                </div>
                 <div class="summary-item">
                     <span>Total:</span>
                     <span id="totalPrice">$100.00</span>
                 </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="promoCodeInput">Promo or feature code</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="promoCodeInput" placeholder="Enter code" style="flex: 1; padding: 10px; border: 1px solid rgba(0,0,0,0.12); border-radius: 10px;">
+                    <button type="button" id="applyCodeBtn" class="btn-secondary" style="padding: 10px 20px;">Apply</button>
+                </div>
+                <p id="codeMessage" style="margin-top: 8px; font-size: 0.9em; color: #666;"></p>
             </div>
 
             <form id="paymentForm" class="payment-form">
@@ -205,7 +230,7 @@
                 <div class="success-message" id="successMessage">
                     <h3>Payment Successful! ✓</h3>
                     <p>Thank you for your purchase. You now have access to the questionnaire.</p>
-                    <button type="button" class="btn-primary" onclick="window.location.href='/questionnaire.html'" style="margin-top: 20px;">
+                    <button type="button" class="btn-primary" id="accessModulesBtn" onclick="window.location.href='/modules?tutorial=1'" style="margin-top: 20px;">
                         Access Questionnaire
                     </button>
                 </div>
@@ -223,16 +248,77 @@
         const planNames = {
             basic: 'Basic Plan',
             premium: 'Premium Plan',
+            'plus-one-meeting': 'Premium + 1 Meeting',
+            'weekly-meeting': 'Premium + Weekly Meetings',
+            'one-time-meeting': 'One-time: 1 Meeting',
             enterprise: 'Enterprise Plan'
         };
 
         const selectedPlan = sessionStorage.getItem('selectedPlan') || 'premium';
-        const selectedPrice = parseInt(sessionStorage.getItem('selectedPrice')) || 100;
+        let selectedPrice = parseInt(sessionStorage.getItem('selectedPrice'), 10) || 50;
+        let appliedCode = null;
+        let displayPrice = selectedPrice;
 
-        // Update order summary
-        document.getElementById('planName').textContent = planNames[selectedPlan] || 'Premium Plan';
-        document.getElementById('planPrice').textContent = `$${selectedPrice}.00`;
-        document.getElementById('totalPrice').textContent = `$${selectedPrice}.00`;
+        function updateOrderSummary() {
+            document.getElementById('planName').textContent = planNames[selectedPlan] || 'Premium Plan';
+            document.getElementById('planPrice').textContent = `$${selectedPrice}.00`;
+            const codeRow = document.getElementById('codeSummaryRow');
+            const codeSummary = document.getElementById('codeSummaryText');
+            const totalEl = document.getElementById('totalPrice');
+            if (appliedCode && appliedCode.valid) {
+                codeRow.style.display = 'flex';
+                if (appliedCode.type === 'feature' && appliedCode.grantPlan) {
+                    codeSummary.textContent = appliedCode.planName + ' (free)';
+                    displayPrice = 0;
+                } else if (appliedCode.type === 'promo') {
+                    let discounted = selectedPrice * 100;
+                    if (appliedCode.discountPercent) discounted = discounted * (1 - appliedCode.discountPercent / 100);
+                    if (appliedCode.discountAmount) discounted = Math.max(0, discounted - appliedCode.discountAmount);
+                    displayPrice = Math.round(discounted) / 100;
+                    codeSummary.textContent = 'Discount applied';
+                }
+                totalEl.textContent = displayPrice === 0 ? 'Free' : `$${displayPrice.toFixed(2)}`;
+            } else {
+                codeRow.style.display = 'none';
+                displayPrice = selectedPrice;
+                totalEl.textContent = `$${selectedPrice}.00`;
+            }
+        }
+        updateOrderSummary();
+
+        document.getElementById('applyCodeBtn').addEventListener('click', async () => {
+            const input = document.getElementById('promoCodeInput');
+            const msg = document.getElementById('codeMessage');
+            const code = (input?.value || '').trim();
+            if (!code) {
+                msg.textContent = 'Enter a code.';
+                msg.style.color = '#999';
+                return;
+            }
+            try {
+                const res = await fetch('/api/payment/validate-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                const data = await res.json();
+                if (data.valid) {
+                    appliedCode = data;
+                    msg.textContent = data.type === 'feature' ? `Code applied: ${data.planName || 'plan'} at no charge.` : 'Discount applied.';
+                    msg.style.color = '#0a0';
+                } else {
+                    appliedCode = null;
+                    msg.textContent = 'Invalid or expired code.';
+                    msg.style.color = '#c00';
+                }
+                updateOrderSummary();
+            } catch (e) {
+                msg.textContent = 'Could not validate code.';
+                msg.style.color = '#c00';
+                appliedCode = null;
+                updateOrderSummary();
+            }
+        });
 
         // Check if user is logged in before allowing payment
         async function checkAuthBeforePayment() {
@@ -260,12 +346,10 @@
                 return;
             }
 
-            const form = e.target;
             const loading = document.getElementById('loading');
             const successMessage = document.getElementById('successMessage');
             const paymentActions = document.getElementById('paymentActions');
 
-            form.style.display = 'none';
             paymentActions.style.display = 'none';
             loading.classList.add('show');
 
@@ -274,10 +358,24 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ plan: selectedPlan, price: selectedPrice })
+                    body: JSON.stringify({
+                        plan: selectedPlan,
+                        price: selectedPrice,
+                        code: document.getElementById('promoCodeInput')?.value?.trim() || undefined
+                    })
                 });
                 const sessionData = await sessionRes.json().catch(() => ({}));
 
+                if (sessionRes.ok && sessionData.granted) {
+                    localStorage.setItem('paymentCompleted', 'true');
+                    localStorage.setItem('paymentPlan', sessionData.plan || selectedPlan);
+                    localStorage.setItem('paymentDate', new Date().toISOString());
+                    sessionStorage.removeItem('selectedPlan');
+                    sessionStorage.removeItem('selectedPrice');
+                    successMessage.classList.add('show');
+                    loading.classList.remove('show');
+                    return;
+                }
                 if (sessionRes.ok && sessionData.url) {
                     window.location.href = sessionData.url;
                     return;
@@ -297,11 +395,12 @@
 
             let paymentRecorded = false;
             try {
+                const codeToSend = document.getElementById('promoCodeInput')?.value?.trim() || undefined;
                 const paymentResponse = await fetch('/api/payment/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ plan: selectedPlan, price: selectedPrice })
+                    body: JSON.stringify({ plan: selectedPlan, price: selectedPrice, code: codeToSend })
                 });
                 if (paymentResponse.ok) {
                     const paymentData = await paymentResponse.json();
@@ -310,6 +409,9 @@
                         localStorage.setItem('paymentCompleted', 'true');
                         localStorage.setItem('paymentPlan', selectedPlan);
                         localStorage.setItem('paymentDate', paymentData.paymentDate || new Date().toISOString());
+                        if (localStorage.getItem('pathwiseTutorialCompleted') !== '1') {
+                            localStorage.setItem('pathwiseTutorialPending', '1');
+                        }
                     }
                 } else if (paymentResponse.status === 401) {
                     loading.classList.remove('show');
@@ -324,14 +426,12 @@
             loading.classList.remove('show');
             if (!paymentRecorded) {
                 alert('Payment could not be recorded. Please try again or contact support.');
-                form.style.display = 'block';
                 paymentActions.style.display = 'flex';
                 return;
             }
             successMessage.classList.add('show');
             sessionStorage.removeItem('selectedPlan');
             sessionStorage.removeItem('selectedPrice');
-            await updateNavigation();
         });
 
         // Check payment status (server-based, account-specific)
@@ -373,15 +473,17 @@
 
         // Update navigation based on auth and payment status
         async function updateNavigation() {
-            const counselorLink = document.getElementById('counselorLink');
             const plansLink = document.getElementById('plansLink');
-            if (counselorLink && plansLink) {
-                const hasAccess = await hasPaymentAccess();
-                if (hasAccess) {
-                    counselorLink.style.display = 'block';
-                    plansLink.style.display = 'none';
-                } else {
-                    counselorLink.style.display = 'none';
+            if (plansLink) {
+                try {
+                    const [authRes, paymentRes] = await Promise.all([
+                        fetch('/api/auth/check', { credentials: 'include' }),
+                        fetch('/api/payment/status', { credentials: 'include' })
+                    ]);
+                    const auth = (await authRes.json()).authenticated;
+                    const hasAccess = (await paymentRes.json()).hasPayment;
+                    plansLink.style.display = (auth || !hasAccess) ? 'block' : 'none';
+                } catch (e) {
                     plansLink.style.display = 'block';
                 }
             }
@@ -397,7 +499,7 @@
                 
                 const loginLink = document.getElementById('loginLink');
                 const logoutButton = document.getElementById('logoutButton');
-                const counselorLink = document.getElementById('counselorLink');
+                const plansLink = document.getElementById('plansLink');
                 
                 if (data.authenticated) {
                     if (loginLink) loginLink.style.display = 'none';
@@ -407,20 +509,9 @@
                     if (logoutButton) logoutButton.style.display = 'none';
                 }
                 
-                // Show Counselor button and hide Plans link if payment completed
-                const plansLink = document.getElementById('plansLink');
-                const responsesLink = document.getElementById('responsesLink');
-                if (counselorLink && plansLink) {
+                if (plansLink) {
                     const hasAccess = await hasPaymentAccess();
-                    if (hasAccess) {
-                        counselorLink.style.display = 'block';
-                        plansLink.style.display = 'none';
-                        if (responsesLink) responsesLink.style.display = 'block';
-                    } else {
-                        counselorLink.style.display = 'none';
-                        plansLink.style.display = 'block';
-                        if (responsesLink) responsesLink.style.display = 'none';
-                    }
+                    plansLink.style.display = (data.authenticated || !hasAccess) ? 'block' : 'none';
                 }
             } catch (error) {
                 console.error('Auth check error:', error);
@@ -464,6 +555,7 @@
             }
         });
     </script>
+    <script src="/nav-modules.js"></script>
 </body>
 </html>
 

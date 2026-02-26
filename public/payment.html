@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Choose Payment Plan - Pathwise</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
         .payment-container {
             background: white;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
             max-width: 1000px;
             margin: 0 auto;
         }
@@ -31,34 +31,151 @@
             font-size: 1.1rem;
         }
 
+        .plan-header-with-deal {
+            height: 5.4rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .plan-header-with-deal .plan-name {
+            min-height: auto;
+            margin-bottom: 4px;
+        }
+
+        .plan-card[data-plan="premium"] .plan-price {
+            display: flex;
+            align-items: baseline;
+            width: 100%;
+        }
+
+        .plan-card[data-plan="premium"] .plan-price-left {
+            flex: 1;
+            display: flex;
+            justify-content: flex-end;
+            padding-right: 10px;
+        }
+
+        .plan-card[data-plan="premium"] .plan-price-center {
+            flex-shrink: 0;
+        }
+
+        .plan-card[data-plan="premium"] .plan-price-right {
+            flex: 1;
+        }
+
+        .plan-card[data-plan="premium"] .plan-price-original {
+            margin-right: 0;
+        }
+
+        .early-bird-deal {
+            display: inline-block;
+            font-weight: 700;
+            font-size: 1rem;
+            font-style: italic;
+            transform: skewX(-8deg);
+            animation: rainbow-flash 2s linear infinite;
+        }
+
+        .plan-price-flash {
+            font-weight: 700;
+            animation: rainbow-flash 2s linear infinite;
+        }
+
+        @keyframes rainbow-flash {
+            0% { color: #ff0000; }
+            17% { color: #ff8800; }
+            33% { color: #ffdd00; }
+            50% { color: #00dd00; }
+            67% { color: #0088ff; }
+            83% { color: #8800ff; }
+            100% { color: #ff0000; }
+        }
+
+        .plan-price-original {
+            text-decoration: line-through;
+            color: #999;
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
         .plans-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-evenly;
+            align-items: stretch;
+            gap: 24px;
             margin-bottom: 40px;
         }
 
         .plan-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 220px;
+            min-width: 220px;
+            max-width: 320px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 16px;
             padding: 30px;
             text-align: center;
             transition: all 0.3s;
-            background: #f8f9fa;
+            background: white;
             cursor: pointer;
             position: relative;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
         }
 
         .plan-card:hover {
-            border-color: #555;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-            transform: translateY(-5px);
+            border-color: rgba(66, 133, 244, 0.3);
+            box-shadow: 0 8px 32px rgba(66, 133, 244, 0.1);
+            transform: translateY(-4px);
         }
 
         .plan-card.selected {
-            border-color: #555;
-            background: #f0f0f0;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            border-color: rgba(66, 133, 244, 0.5);
+            background: rgba(66, 133, 244, 0.04);
+            box-shadow: 0 8px 32px rgba(66, 133, 244, 0.12);
+        }
+
+        .plan-card.current-plan {
+            outline: 2px solid rgba(66, 133, 244, 0.4);
+            outline-offset: 2px;
+        }
+
+        .proceed-slot {
+            position: relative;
+        }
+
+        .proceed-slot .current-plan-badge {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            background: #e0e0e0;
+            color: #333;
+            border: 2px solid #999;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .proceed-slot .current-plan-badge.show {
+            display: flex;
+        }
+
+        .payment-actions.current-plan-state .proceed-slot .btn-primary {
+            visibility: hidden;
+        }
+
+        .payment-actions.current-plan-state {
+            opacity: 0.85;
+            pointer-events: none;
         }
 
         .plan-card .plan-name {
@@ -66,25 +183,29 @@
             font-weight: 700;
             color: #333;
             margin-bottom: 10px;
+            min-height: 3.6em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .plan-card .plan-price {
             font-size: 3rem;
             font-weight: 700;
             color: #333;
-            margin: 20px 0;
+            margin: 0 0 4px 0;
         }
 
         .plan-card .plan-price-label {
             color: #666;
             font-size: 1rem;
-            margin-bottom: 20px;
+            margin: 0 0 20px 0;
         }
 
         .plan-card .plan-features {
             list-style: none;
             text-align: left;
-            margin: 20px 0;
+            margin: 0;
             padding: 0;
         }
 
@@ -113,11 +234,11 @@
         }
 
         .btn-primary {
-            background: #555;
+            background: #4285F4;
             color: white;
             border: none;
             padding: 15px 40px;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
@@ -125,7 +246,7 @@
         }
 
         .btn-primary:hover {
-            background: #444;
+            background: #3367d6;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
@@ -177,8 +298,13 @@
 
         .payment-actions .btn-primary {
             border-color: transparent;
-            background: #555;
+            background: #28A745;
             color: white;
+        }
+
+        .payment-actions .btn-primary:hover {
+            background: #218838;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
         }
 
         .payment-actions .btn-secondary {
@@ -189,15 +315,20 @@
 
     </style>
 </head>
-<body>
+<body class="fp-page">
     <div class="container">
         <!-- Navigation Header -->
         <nav class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
-                <a href="/payment" id="plansLink" style="display: block;">Plans</a>
-                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
-                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink" style="display: block;">Pricing</a>
                 <a href="/login.html" id="loginLink" class="auth-button">Login</a>
                 <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
             </div>
@@ -205,15 +336,26 @@
 
         <div class="payment-container">
             <div class="payment-header">
-                <h1>Premium Plan</h1>
+                <h1>Choose Your Plan</h1>
                 <p>Complete your payment to access the questionnaire</p>
             </div>
 
-            <div class="plans-grid" id="plansGrid" style="display: flex; justify-content: center;">
-                <div class="plan-card selected" data-plan="premium" data-price="100" style="max-width: 400px;">
-                    <div class="plan-name">Premium Plan</div>
-                    <div class="plan-price">$100</div>
-                    <div class="plan-price-label">One-time payment</div>
+            <div class="plans-grid" id="plansGrid">
+                <div class="plan-card" data-plan="premium" data-price="25">
+                    <div class="plan-header-with-deal">
+                        <div class="plan-name">Premium Plan</div>
+                        <div class="early-bird-deal">Early Bird Deal!</div>
+                    </div>
+                    <div class="plan-price">
+                        <div class="plan-price-left">
+                            <span class="plan-price-original">$50</span>
+                        </div>
+                        <div class="plan-price-center">
+                            <span class="plan-price-flash">$25</span>
+                        </div>
+                        <div class="plan-price-right"></div>
+                    </div>
+                    <div class="plan-price-label">per month</div>
                     <ul class="plan-features">
                         <li>Full access to questionnaire</li>
                         <li>Unlimited responses</li>
@@ -222,20 +364,91 @@
                         <li>Custom question sets</li>
                     </ul>
                 </div>
+                <div class="plan-card" data-plan="plus-one-meeting" data-price="100">
+                    <div class="plan-name">Premium + 1 Meeting</div>
+                    <div class="plan-price">$100</div>
+                    <div class="plan-price-label">per month</div>
+                    <ul class="plan-features">
+                        <li>Everything in Premium</li>
+                        <li>1 meeting per month with a cofounder</li>
+                        <li>Personalized guidance</li>
+                    </ul>
+                </div>
+                <div class="plan-card" data-plan="weekly-meeting" data-price="200">
+                    <div class="plan-name">Premium + Weekly Meetings</div>
+                    <div class="plan-price">$200</div>
+                    <div class="plan-price-label">per month</div>
+                    <ul class="plan-features">
+                        <li>Everything in Premium</li>
+                        <li>1 meeting per week with a cofounder</li>
+                        <li>Ongoing personalized support</li>
+                    </ul>
+                </div>
+                <div class="plan-card" id="oneTimeMeetingCard" data-plan="one-time-meeting" data-price="60" style="display: none;">
+                    <div class="plan-name">One-time: 1 Meeting</div>
+                    <div class="plan-price">$60</div>
+                    <div class="plan-price-label">one-time payment</div>
+                    <ul class="plan-features">
+                        <li>1 meeting with the cofounders</li>
+                        <li>Personalized guidance</li>
+                    </ul>
+                </div>
             </div>
 
-            <div class="payment-actions">
+            <div class="payment-actions" id="paymentActions">
                 <button class="btn-secondary" onclick="window.location.href='/'">Cancel</button>
-                <button class="btn-primary" id="proceedButton" onclick="proceedToPayment()">Proceed to Payment</button>
+                <div class="proceed-slot">
+                    <button class="btn-primary" id="proceedButton" onclick="proceedToPayment()">Proceed to Payment</button>
+                    <div class="current-plan-badge" id="currentPlanBadge">Current Plan</div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         let selectedPlan = 'premium';
-        let selectedPrice = 100;
+        let selectedPrice = 50;
+        let currentUserPlan = null;
 
-        // Only one plan, so it's always selected
+        const planNames = {
+            premium: 'Premium Plan',
+            'plus-one-meeting': 'Premium + 1 Meeting',
+            'weekly-meeting': 'Premium + Weekly Meetings',
+            'one-time-meeting': 'One-time: 1 Meeting'
+        };
+
+        function updatePaymentActionsState() {
+            const actions = document.getElementById('paymentActions');
+            const badge = document.getElementById('currentPlanBadge');
+            const isCurrent = currentUserPlan && selectedPlan === currentUserPlan;
+            if (actions) actions.classList.toggle('current-plan-state', !!isCurrent);
+            if (badge) badge.classList.toggle('show', !!isCurrent);
+        }
+
+        function initPlanSelection() {
+            const grid = document.getElementById('plansGrid');
+            if (!grid) return;
+            grid.querySelectorAll('.plan-card').forEach(card => {
+                if (card.style.display === 'none') return;
+                const plan = card.dataset.plan;
+                if (currentUserPlan && plan === currentUserPlan) card.classList.add('current-plan');
+                card.addEventListener('click', () => {
+                    grid.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedPlan = card.dataset.plan || 'premium';
+                    selectedPrice = parseInt(card.dataset.price, 10) || 50;
+                    updatePaymentActionsState();
+                });
+            });
+            let initialCard = currentUserPlan ? grid.querySelector('.plan-card[data-plan="' + currentUserPlan + '"]') : null;
+            if (!initialCard || initialCard.style.display === 'none') initialCard = grid.querySelector('.plan-card');
+            if (initialCard && initialCard.style.display !== 'none') {
+                initialCard.classList.add('selected');
+                selectedPlan = initialCard.dataset.plan || 'premium';
+                selectedPrice = parseInt(initialCard.dataset.price, 10) || 50;
+            }
+            updatePaymentActionsState();
+        }
 
         // Proceed to payment processing page
         function proceedToPayment() {
@@ -293,7 +506,7 @@
                 
                 const loginLink = document.getElementById('loginLink');
                 const logoutButton = document.getElementById('logoutButton');
-                const counselorLink = document.getElementById('counselorLink');
+                const plansLink = document.getElementById('plansLink');
                 
                 if (data.authenticated) {
                     if (loginLink) loginLink.style.display = 'none';
@@ -303,20 +516,10 @@
                     if (logoutButton) logoutButton.style.display = 'none';
                 }
                 
-                // Show Counselor button and hide Plans link if payment completed
-                const plansLink = document.getElementById('plansLink');
-                const responsesLink = document.getElementById('responsesLink');
-                if (counselorLink && plansLink) {
+                if (plansLink) {
+                    // Always show Plans when logged in so user can switch; when not logged in show if no access
                     const hasAccess = await hasPaymentAccess();
-                    if (hasAccess) {
-                        counselorLink.style.display = 'block';
-                        plansLink.style.display = 'none';
-                        if (responsesLink) responsesLink.style.display = 'block';
-                    } else {
-                        counselorLink.style.display = 'none';
-                        plansLink.style.display = 'block';
-                        if (responsesLink) responsesLink.style.display = 'none';
-                    }
+                    plansLink.style.display = (data.authenticated || !hasAccess) ? 'block' : 'none';
                 }
             } catch (error) {
                 console.error('Auth check error:', error);
@@ -337,13 +540,9 @@
             }
         }
 
-        // Check if payment already completed and redirect
+        // Optional: if not paid and not logged in, we already show login notice. If paid, stay on plans so they can switch.
         async function checkIfAlreadyPaid() {
-            const hasAccess = await hasPaymentAccess();
-            if (hasAccess) {
-                // Already paid, redirect to questionnaire
-                window.location.href = '/questionnaire.html';
-            }
+            // No redirect when already paid – user can stay to switch plans
         }
 
         // Check if user is logged in
@@ -365,16 +564,33 @@
             // Check if logged in - if not, show message but allow viewing plans
             const isAuthenticated = await checkAuthStatus();
             if (!isAuthenticated) {
-                // Show a message that they need to log in to complete payment
                 const paymentContainer = document.querySelector('.payment-container');
                 if (paymentContainer) {
                     const loginNotice = document.createElement('div');
                     loginNotice.style.cssText = 'background: #f0f0f0; border: 1px solid #999; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;';
-                    loginNotice.innerHTML = '<strong>Note:</strong> Please <a href="/login.html" style="color: #333; text-decoration: underline;">log in</a> before completing payment.';
+                    loginNotice.innerHTML = '<strong>Create an account to continue.</strong> <a href="/login.html?show=register&return=payment" style="color: #333; text-decoration: underline;">Sign up</a>';
                     paymentContainer.insertBefore(loginNotice, paymentContainer.firstChild);
                 }
+                document.getElementById('proceedButton').onclick = function() {
+                    window.location.href = '/login.html?show=register&return=payment';
+                };
             }
 
+            let hasAccess = false;
+            try {
+                const statusRes = await fetch('/api/payment/status', { credentials: 'include' });
+                if (statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    hasAccess = !!statusData.hasPayment;
+                    if (statusData.paymentPlan) currentUserPlan = statusData.paymentPlan;
+                }
+            } catch (e) { console.error('Payment status:', e); }
+            if (!hasAccess) await hasPaymentAccess();
+            const oneTimeCard = document.getElementById('oneTimeMeetingCard');
+            if (oneTimeCard) {
+                oneTimeCard.style.display = hasAccess ? '' : 'none';
+            }
+            initPlanSelection();
             await checkIfAlreadyPaid();
             await checkAuthAndUpdateNav();
             
@@ -384,5 +600,7 @@
             }
         });
     </script>
+    <script src="/nav-modules.js"></script>
+    <script src="/chat-widget.js"></script>
 </body>
 </html>

@@ -357,12 +357,14 @@ class RAGQueryHandler {
     this.chatComplete = chatCompleteFn;
   }
 
-  // Query with RAG - retrieves relevant docs and generates response
+  // Query with RAG - retrieves relevant docs and generates response.
+  // options.moduleText: optional questionnaire/module context included in the prompt.
   async query(query, options = {}) {
     const {
       topK = 5,
       temperature = 0.7,
-      maxTokens = 2048
+      maxTokens = 2048,
+      moduleText = ''
     } = options;
 
     // Search for relevant documents
@@ -390,7 +392,7 @@ class RAGQueryHandler {
 
     // Generate response using GPT-3.5-turbo
     try {
-      const response = await this.queryOpenAI(query, context, { temperature, maxTokens });
+      const response = await this.queryOpenAI(query, context, { temperature, maxTokens, moduleText });
 
       return {
         success: true,
@@ -409,12 +411,16 @@ class RAGQueryHandler {
 
   async queryOpenAI(query, context, options) {
     const system = 'You are a helpful assistant that answers questions based on provided documents.';
-    const userContent = `Documents:
+    const moduleText = (options.moduleText || '').trim();
+    const moduleSection = moduleText
+      ? `Module/questionnaire context (use this to frame your answer):\n${moduleText}\n\n`
+      : '';
+    const userContent = `${moduleSection}Documents:
 ${context}
 
 Question: ${query}
 
-Answer the question based on the documents above. If the answer is not in the documents, say so. Cite which document(s) you used when possible.`;
+Answer the question based on the documents above${moduleSection ? ' and the module context' : ''}. If the answer is not in the documents, say so. Cite which document(s) you used when possible.`;
 
     if (!this.chatComplete) {
       throw new Error('Claude is required for RAG chat. Set ANTHROPIC_API_KEY in .env');

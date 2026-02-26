@@ -149,7 +149,7 @@ async function updateUser(userId, updateData) {
       { id: userId },
       { $set: updateData }
     );
-    return result.modifiedCount > 0;
+    return result.matchedCount > 0;
   } catch (error) {
     console.error('Error updating user in MongoDB:', error);
     return null;
@@ -176,29 +176,33 @@ async function getResponses() {
 
 // Get response by user ID
 async function getResponseByUserId(userId) {
+  const responses = await getResponsesByUserId(userId);
+  return responses && responses.length > 0 ? responses[responses.length - 1] : null;
+}
+
+async function getResponsesByUserId(userId) {
   const database = await connectToDatabase();
   if (!database) return null;
-
   try {
-    const response = await database.collection('responses').findOne({ userId: userId });
-    return response;
+    let responses = await database.collection('responses').find({ userId }).toArray();
+    if (responses.length === 0 && userId != null) {
+      const altId = String(userId);
+      if (altId !== userId) {
+        responses = await database.collection('responses').find({ userId: altId }).toArray();
+      }
+    }
+    return responses;
   } catch (error) {
-    console.error('Error getting response from MongoDB:', error);
+    console.error('Error getting responses from MongoDB:', error);
     return null;
   }
 }
 
-// Create or update response
 async function saveResponse(responseData) {
   const database = await connectToDatabase();
   if (!database) return null;
-
   try {
-    const result = await database.collection('responses').updateOne(
-      { userId: responseData.userId },
-      { $set: responseData },
-      { upsert: true } // Create if doesn't exist, update if exists
-    );
+    await database.collection('responses').insertOne(responseData);
     console.log('✅ Response saved to MongoDB');
     return true;
   } catch (error) {
@@ -515,6 +519,7 @@ module.exports = {
   // Response operations
   getResponses,
   getResponseByUserId,
+  getResponsesByUserId,
   saveResponse,
   updateResponse,
   deleteResponse,

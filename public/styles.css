@@ -1,4 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=swap');
+
+:root {
+    --pathwise-blue: #4285F4;
+    --pathwise-blue-soft: #5B9BF8;
+    --pathwise-accent: #4285F4;
+    --pathwise-green: #28A745;
+    --pathwise-yellow: #F7B500;
+    --pathwise-yellow-soft: #FFD54F;
+    --pathwise-purple: #4285F4;
+    --pathwise-bg: #f5f5f7;
+    --pathwise-gray-light: #F4F4F4;
+    --pathwise-gray-text: #6c757d;
+    --pathwise-border: rgba(0, 0, 0, 0.08);
+    --pathwise-border-light: rgba(66, 133, 244, 0.15);
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-heading: 'DM Serif Display', Georgia, serif;
+    --font-brand: 'Cormorant Garamond', 'DM Serif Display', Georgia, serif;
+}
 
 * {
     margin: 0;
@@ -6,24 +24,47 @@
     box-sizing: border-box;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
+body.fp-page {
+    background: #f5f5f7;
+    background-image: none;
+}
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: #f5f5f5;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    background: var(--pathwise-bg);
+    background-image: none;
     min-height: 100vh;
     padding: 20px;
     color: #333;
 }
 
+h1, h2, h3 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+}
+
 .container {
-    max-width: 800px;
+    max-width: 1600px;
     margin: 0 auto;
+    overflow: visible;
+    animation: containerFadeIn 0.6s ease-out;
+}
+@keyframes containerFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 header {
     background: white;
     padding: 20px 30px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
     margin-bottom: 30px;
     display: flex;
     justify-content: space-between;
@@ -31,7 +72,7 @@ header {
 }
 
 header h1 {
-    color: #667eea;
+    color: var(--pathwise-blue);
     font-size: 2rem;
 }
 
@@ -43,8 +84,8 @@ header h1 {
 .questionnaire-container {
     background: white;
     padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.04);
 }
 
 .loading {
@@ -63,11 +104,11 @@ header h1 {
     text-align: center;
     padding: 15px;
     margin-bottom: 20px;
-    color: #667eea;
     font-weight: 600;
     font-size: 1.1rem;
-    background: #f0f4ff;
+    background: linear-gradient(135deg, rgba(66, 133, 244, 0.12) 0%, rgba(247, 181, 0, 0.12) 100%);
     border-radius: 8px;
+    color: #1a1a1a;
 }
 
 .questions-wrapper {
@@ -92,9 +133,9 @@ header h1 {
 .question-item {
     margin-bottom: 30px;
     padding: 20px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border-left: 4px solid #667eea;
+    background: var(--pathwise-gray-light);
+    border-radius: 12px;
+    border-left: 4px solid rgba(66, 133, 244, 0.4);
 }
 
 .question-item label {
@@ -111,17 +152,17 @@ header h1 {
 .question-item textarea {
     width: 100%;
     padding: 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
     font-size: 1rem;
     font-family: inherit;
-    transition: border-color 0.3s;
+    transition: border-color 0.3s, box-shadow 0.3s;
 }
-
 .question-item input:focus,
 .question-item textarea:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--pathwise-purple);
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
 }
 
 .question-item textarea {
@@ -170,7 +211,7 @@ header h1 {
 }
 
 .btn-primary {
-    background: #555;
+    background: var(--pathwise-green);
     color: white;
     border: none;
     padding: 14px 28px;
@@ -185,7 +226,8 @@ header h1 {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    background: #218838;
 }
 
 .btn-primary:active {
@@ -195,9 +237,9 @@ header h1 {
 .btn-secondary {
     background: white;
     color: #333;
-    border: 2px solid #555;
+    border: 1px solid rgba(66, 133, 244, 0.4);
     padding: 10px 20px;
-    border-radius: 6px;
+    border-radius: 10px;
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
@@ -205,7 +247,7 @@ header h1 {
 }
 
 .btn-secondary:hover {
-    background: #555;
+    background: var(--pathwise-purple);
     color: white;
 }
 
@@ -215,7 +257,7 @@ header h1 {
 }
 
 .thank-you h2 {
-    color: #667eea;
+    color: var(--pathwise-blue);
     margin-bottom: 15px;
     font-size: 2rem;
 }
@@ -261,7 +303,7 @@ header h1 {
 }
 
 .modal-header h2 {
-    color: #667eea;
+    color: var(--pathwise-blue);
     margin: 0;
 }
 
@@ -340,8 +382,8 @@ header h1 {
 
 .login-box {
     background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    border-radius: 20px;
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.06);
     width: 100%;
     max-width: 450px;
     padding: 40px;
@@ -350,57 +392,63 @@ header h1 {
 .logo {
     text-align: center;
     margin-bottom: 40px;
-    font-family: 'DM Serif Display', serif;
+    font-family: var(--font-brand);
 }
 
-/* Shared nav bar - same size on all pages, sticks with same gap as at top (body padding) */
+/* Shared nav bar - same on all pages */
 .nav-header {
     position: sticky;
     top: 20px;
     z-index: 100;
     background: white;
-    padding: 15px 30px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 20px 40px;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     margin-bottom: 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: box-shadow 0.3s ease;
+}
+.nav-header:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .nav-header .logo {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.8rem;
+    font-family: var(--font-brand);
+    font-size: 1.5rem;
     font-weight: 700;
-    color: #000;
+    letter-spacing: 0.02em;
+    color: #1a1a1a;
     text-decoration: none;
     display: flex;
     align-items: center;
+    gap: 12px;
     line-height: 1;
     margin: 0;
     padding: 0;
-    transition: transform 0.25s ease, opacity 0.25s ease;
+    transition: opacity 0.25s ease;
 }
 
 .nav-header .logo:hover {
-    transform: scale(1.03);
     opacity: 0.9;
 }
 
+
+
 .nav-links {
     display: flex;
-    gap: 20px;
+    gap: 32px;
     align-items: center;
+    overflow: visible;
 }
 
 .nav-links a,
 .nav-links button {
-    color: #333;
+    color: #555;
     text-decoration: none;
     font-weight: 500;
-    padding: 8px 16px;
-    border-radius: 6px;
-    transition: all 0.25s ease;
+    padding: 0;
     border: none;
     background: none;
     cursor: pointer;
@@ -409,48 +457,84 @@ header h1 {
     display: flex;
     align-items: center;
     line-height: 1;
-    position: relative;
-}
-
-.nav-links a::after,
-.nav-links button::after {
-    content: '';
-    position: absolute;
-    bottom: 4px;
-    left: 16px;
-    right: 16px;
-    height: 2px;
-    background: #555;
-    border-radius: 1px;
-    transform: scaleX(0);
-    transition: transform 0.25s ease;
 }
 
 .nav-links a:hover,
 .nav-links button:hover {
-    background: #e8e8e8;
-    color: #333;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-}
-
-.nav-links a:hover::after,
-.nav-links button:hover::after {
-    transform: scaleX(1);
+    color: #1a1a1a;
 }
 
 .nav-links a:active,
 .nav-links button:active {
-    transform: translateY(0);
-    box-shadow: none;
+    color: #1a1a1a;
 }
 
 .nav-links .auth-button {
     margin-left: auto;
 }
 
+.nav-links #plansLink {
+    margin-right: 20px;
+}
+
+/* Modules dropdown (logged-in only) */
+.nav-modules-dropdown {
+    position: relative;
+}
+.nav-modules-dropdown .dropdown-btn {
+    background: none;
+    border: none;
+    color: #555;
+    font-weight: 500;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1rem;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.nav-modules-dropdown .dropdown-btn:hover {
+    color: #1a1a1a;
+}
+.nav-modules-dropdown .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 200px;
+    max-height: min(70vh, 400px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 200;
+}
+.nav-modules-dropdown .dropdown-menu.show {
+    display: block;
+}
+.nav-modules-dropdown .dropdown-menu a {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    color: #333;
+    text-decoration: none;
+    border: none;
+    border-bottom: 1px solid #eee;
+    border-radius: 0;
+    white-space: nowrap;
+}
+.nav-modules-dropdown .dropdown-menu a:last-child {
+    border-bottom: none;
+}
+.nav-modules-dropdown .dropdown-menu a:hover {
+    background: #f0f0f0;
+}
+
 .logo h1 {
-    font-family: 'DM Serif Display', serif;
+    font-family: var(--font-heading);
     color: #000;
     font-size: 2.5rem;
     margin-bottom: 8px;
@@ -467,7 +551,7 @@ header h1 {
     margin-bottom: 8px;
     font-size: 2rem;
     text-align: center;
-    font-family: 'DM Serif Display', serif;
+    font-family: var(--font-heading);
 }
 
 .auth-form .subtitle {
@@ -475,7 +559,7 @@ header h1 {
     margin-bottom: 30px;
     font-size: 1rem;
     text-align: center;
-    font-family: 'DM Serif Display', serif;
+    font-family: var(--font-body);
 }
 
 .subtitle {
@@ -499,7 +583,7 @@ header h1 {
 .form-group input {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e0e0e0;
+    border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 8px;
     font-size: 1rem;
     font-family: inherit;
@@ -508,7 +592,7 @@ header h1 {
 
 .form-group input:focus {
     outline: none;
-    border-color: #555;
+    border-color: var(--pathwise-purple);
 }
 
 .btn-full {
@@ -539,9 +623,15 @@ header h1 {
 }
 
 .user-info {
-    color: #667eea;
+    color: var(--pathwise-purple);
     font-weight: 600;
     margin-right: 15px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .container {
+        animation: none;
+    }
 }
 
 @media (max-width: 768px) {

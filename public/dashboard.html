@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <title>Student Dashboard - Pathwise</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .dashboard-home { padding: 40px 0; max-width: none; margin: 0 auto; }
+        .dashboard-home h1 { font-family: var(--font-heading); font-size: 2.5rem; color: #000; margin-bottom: 24px; }
+        .dashboard-locked { text-align: center; padding: 48px 24px; background: white; border-radius: 20px; box-shadow: 0 2px 24px rgba(0,0,0,0.04); }
+        .dashboard-locked h2 { font-size: 1.5rem; color: #333; margin-bottom: 16px; }
+        .dashboard-locked p { margin-bottom: 24px; color: #555; }
+        .dashboard-layout { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+        .dashboard-colleges { flex: 0 0 260px; min-width: 0; background: white; border-radius: 16px; box-shadow: 0 2px 20px rgba(0,0,0,0.04); padding: 20px; max-height: 75vh; overflow-y: auto; }
+        .dashboard-colleges h2 { font-size: 1.15rem; color: #333; margin-bottom: 16px; font-weight: 600; }
+        .dashboard-college-list { list-style: none; padding: 0; margin: 0; }
+        .dashboard-college-item { padding: 14px 0; border-bottom: 1px solid #eee; }
+        .dashboard-college-item:last-child { border-bottom: none; }
+        .dashboard-college-name { font-weight: 600; color: #000; margin-bottom: 6px; }
+        .dashboard-college-dates { font-size: 0.85rem; color: #555; line-height: 1.5; }
+        .dashboard-college-dates span { display: block; }
+        .dashboard-college-dates .empty { color: #999; font-style: italic; }
+        .dashboard-calendar-wrap { flex: 1; min-width: 480px; background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 28px; }
+        .dashboard-calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 8px; }
+        .dashboard-calendar-title { font-size: 1.35rem; font-weight: 600; color: #333; margin: 0; }
+        .dashboard-calendar-nav { display: flex; gap: 10px; }
+        .dashboard-calendar-nav button {
+            padding: 10px 18px; border: 1px solid rgba(0,0,0,0.1); background: #fafafa; border-radius: 10px; cursor: pointer; font-size: 0.95rem; color: #333;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+        .dashboard-calendar-nav button:hover { background: #fff; border-color: rgba(66,133,244,0.3); box-shadow: 0 2px 12px rgba(66,133,244,0.08); transform: translateY(-1px); }
+        .dashboard-calendar-nav button:active { transform: translateY(0); box-shadow: none; }
+        .dashboard-calendar-grid { border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; overflow: hidden; }
+        .dashboard-calendar-weekdays {
+            display: grid; grid-template-columns: repeat(7, 1fr); font-size: 0.8rem; font-weight: 600; color: #555;
+            background: #f8f8f8; border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+        .dashboard-calendar-weekday { padding: 10px 8px; text-align: center; border-right: 1px solid rgba(0,0,0,0.08); }
+        .dashboard-calendar-weekday:last-child { border-right: none; }
+        .dashboard-calendar-days {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            transition: opacity 0.25s ease;
+        }
+        .dashboard-calendar-days.calendar-transition { opacity: 0; }
+        .dashboard-calendar-day {
+            min-height: 48px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; font-size: 1rem; color: #333;
+            padding: 6px 8px; border-right: 1px solid rgba(0,0,0,0.06); border-bottom: 1px solid rgba(0,0,0,0.06);
+            transition: background 0.15s ease; overflow: hidden;
+        }
+        .dashboard-calendar-day .day-num { font-weight: 600; flex-shrink: 0; }
+        .dashboard-calendar-day .day-events { font-size: 0.65rem; line-height: 1.25; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .dashboard-calendar-day .day-events span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dashboard-calendar-day .day-note-indicator { font-size: 0.65rem; color: #666; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .dashboard-calendar-day.today .day-note-indicator { color: rgba(255,255,255,0.9); }
+        .dashboard-calendar-day:nth-child(7n) { border-right: none; }
+        .dashboard-calendar-day:hover { background: #f5f5f5; }
+        .dashboard-calendar-day.other-month { color: #aaa; }
+        .dashboard-calendar-day.other-month:hover { background: #f9f9f9; }
+        .dashboard-calendar-day.today { background: #4285F4; color: white; font-weight: 600; }
+        .dashboard-calendar-day.today:hover { background: #3367d6; }
+        .dashboard-calendar-day { cursor: pointer; }
+        .dashboard-date-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000;
+            display: flex; align-items: center; justify-content: center; padding: 24px;
+            opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+        .dashboard-date-modal-overlay.open { opacity: 1; visibility: visible; }
+        .dashboard-date-modal {
+            background: white; border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+            max-width: 420px; width: 100%; max-height: 85vh; overflow: hidden;
+            transform: scale(0.95); transition: transform 0.2s ease;
+        }
+        .dashboard-date-modal-overlay.open .dashboard-date-modal { transform: scale(1); }
+        .dashboard-date-modal-header {
+            padding: 20px 24px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+        }
+        .dashboard-date-modal-title { font-size: 1.35rem; font-weight: 600; color: #333; margin: 0; line-height: 1.3; }
+        .dashboard-date-modal-close {
+            flex-shrink: 0; width: 36px; height: 36px; border: none; background: #f0f0f0; border-radius: 10px;
+            cursor: pointer; font-size: 1.25rem; line-height: 1; color: #555; display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        .dashboard-date-modal-close:hover { background: #e0e0e0; color: #000; }
+        .dashboard-date-modal-body { padding: 20px 24px 24px; overflow-y: auto; max-height: 60vh; }
+        .dashboard-date-modal-events { list-style: none; padding: 0; margin: 0; }
+        .dashboard-date-modal-events li {
+            padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 1rem; color: #333; line-height: 1.4;
+        }
+        .dashboard-date-modal-events li:last-child { border-bottom: none; }
+        .dashboard-date-modal-empty { color: #888; font-style: italic; padding: 12px 0; }
+        .dashboard-date-modal-notes { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+        .dashboard-date-modal-events-wrap { margin-top: 0; }
+        .dashboard-date-modal-notes label { display: block; font-size: 0.9rem; font-weight: 600; color: #333; margin-bottom: 8px; }
+        .dashboard-date-modal-notes textarea {
+            width: 100%; min-height: 100px; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 0.95rem; font-family: inherit;
+            resize: vertical; box-sizing: border-box;
+        }
+        .dashboard-date-modal-notes textarea:focus { outline: none; border-color: #4285F4; }
+        @media (max-width: 768px) { .dashboard-layout { flex-direction: column; } .dashboard-colleges { max-height: none; } }
+    </style>
+</head>
+<body class="dashboard-page">
+    <div class="container">
+        <nav class="nav-header">
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
+            <div class="nav-links">
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink" style="display: block;">Pricing</a>
+                <a href="/login.html" id="loginLink" class="auth-button">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </nav>
+
+        <div id="dashboardLoading" class="dashboard-home" style="text-align: center; padding: 48px;">
+            <p>Loading…</p>
+        </div>
+        <div id="dashboardLocked" class="dashboard-home" style="display: none;">
+            <div class="dashboard-locked">
+                <h2>Dashboard is for subscribers</h2>
+                <p>Choose a plan to unlock your dashboard and full access to all modules.</p>
+                <a href="/payment" class="btn-primary" style="display: inline-block; text-decoration: none;">View Plans</a>
+            </div>
+        </div>
+        <div id="dashboardContent" class="dashboard-home" style="display: none;">
+            <h1>Student Dashboard</h1>
+            <div class="dashboard-layout">
+                <aside class="dashboard-colleges">
+                    <h2>My colleges</h2>
+                    <ul class="dashboard-college-list" id="dashboardCollegeList"></ul>
+                </aside>
+                <div class="dashboard-calendar-wrap">
+                    <div class="dashboard-calendar-header">
+                        <h2 class="dashboard-calendar-title" id="dashboardCalendarTitle">Calendar</h2>
+                        <div class="dashboard-calendar-nav">
+                            <button type="button" id="dashboardCalPrev" aria-label="Previous month">← Prev</button>
+                            <button type="button" id="dashboardCalNext" aria-label="Next month">Next →</button>
+                        </div>
+                    </div>
+                    <div class="dashboard-calendar-grid">
+                        <div class="dashboard-calendar-weekdays">
+                            <span class="dashboard-calendar-weekday">Sun</span>
+                            <span class="dashboard-calendar-weekday">Mon</span>
+                            <span class="dashboard-calendar-weekday">Tue</span>
+                            <span class="dashboard-calendar-weekday">Wed</span>
+                            <span class="dashboard-calendar-weekday">Thu</span>
+                            <span class="dashboard-calendar-weekday">Fri</span>
+                            <span class="dashboard-calendar-weekday">Sat</span>
+                        </div>
+                        <div class="dashboard-calendar-days" id="dashboardCalendarDays"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="dashboardDateModal" class="dashboard-date-modal-overlay" aria-hidden="true">
+            <div class="dashboard-date-modal" role="dialog" aria-labelledby="dashboardDateModalTitle">
+                <div class="dashboard-date-modal-header">
+                    <h3 class="dashboard-date-modal-title" id="dashboardDateModalTitle">Date</h3>
+                    <button type="button" class="dashboard-date-modal-close" id="dashboardDateModalClose" aria-label="Close">×</button>
+                </div>
+                <div class="dashboard-date-modal-body">
+                    <div class="dashboard-date-modal-notes">
+                        <label for="dashboardDateModalNotes">Notes</label>
+                        <textarea id="dashboardDateModalNotes" placeholder="Add a note for this date…"></textarea>
+                    </div>
+                    <div class="dashboard-date-modal-events-wrap">
+                        <ul class="dashboard-date-modal-events" id="dashboardDateModalEvents"></ul>
+                        <p class="dashboard-date-modal-empty" id="dashboardDateModalEmpty" style="display: none;">Nothing on this date.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (async function() {
+            const loading = document.getElementById('dashboardLoading');
+            const locked = document.getElementById('dashboardLocked');
+            const content = document.getElementById('dashboardContent');
+            try {
+                const [authRes, paymentRes] = await Promise.all([
+                    fetch('/api/auth/check', { credentials: 'include' }),
+                    fetch('/api/payment/status', { credentials: 'include' })
+                ]);
+                const auth = (await authRes.json()).authenticated;
+                const payment = (await paymentRes.json()).hasPayment;
+                loading.style.display = 'none';
+                if (!auth) {
+                    window.location.href = '/login.html?return=' + encodeURIComponent('/dashboard');
+                    return;
+                }
+                if (!payment) {
+                    locked.style.display = 'block';
+                    return;
+                }
+                content.style.display = 'block';
+                try {
+                    var notesRes = await fetch('/api/date-notes', { credentials: 'include' });
+                    var notesData = await notesRes.json();
+                    window.dashboardDateNotes = (notesData && notesData.notes && typeof notesData.notes === 'object') ? notesData.notes : {};
+                } catch (_) { window.dashboardDateNotes = {}; }
+                initDashboardColleges();
+                initDashboardCalendar();
+            } catch (e) {
+                console.error(e);
+                loading.style.display = 'none';
+                locked.style.display = 'block';
+            }
+        })();
+    </script>
+    <script>
+        var dashboardCollegeList = [];
+        function renderDashboardCollegeList(list) {
+            dashboardCollegeList = list || [];
+            if (window.dashboardCalendarRender) window.dashboardCalendarRender();
+            const listEl = document.getElementById('dashboardCollegeList');
+            if (!listEl) return;
+            if (!list || list.length === 0) {
+                listEl.innerHTML = '<li class="dashboard-college-item"><span class="dashboard-college-dates empty">No colleges added yet. Add colleges in the Modules to see deadlines here.</span></li>';
+                return;
+            }
+            listEl.innerHTML = list.map(function(c) {
+                var name = (c && c.name) ? String(c.name).trim() : '';
+                if (!name) return '';
+                var rea = (c.rea != null) ? String(c.rea).trim() : '';
+                var ea = (c.ea != null) ? String(c.ea).trim() : '';
+                var ed = (c.ed != null) ? String(c.ed).trim() : '';
+                var rd = (c.rd != null) ? String(c.rd).trim() : '';
+                var lines = [];
+                if (rea) lines.push('REA: ' + rea);
+                if (ea) lines.push('EA: ' + ea);
+                if (ed) lines.push('ED: ' + ed);
+                if (rd) lines.push('RD: ' + rd);
+                var datesHtml = lines.length ? lines.map(function(l) { return '<span>' + l + '</span>'; }).join('') : '<span class="empty">No dates saved</span>';
+                return '<li class="dashboard-college-item"><div class="dashboard-college-name">' + escapeHtml(name) + '</div><div class="dashboard-college-dates">' + datesHtml + '</div></li>';
+            }).join('');
+        }
+        async function initDashboardColleges() {
+            const listEl = document.getElementById('dashboardCollegeList');
+            if (!listEl) return;
+            try {
+                const res = await fetch('/api/college-list', { credentials: 'include' });
+                const data = await res.json();
+                const list = (data && data.list && Array.isArray(data.list)) ? data.list : [];
+                renderDashboardCollegeList(list);
+                if (list.length > 0) {
+                    fetch('/api/college-list/refresh-dates', { method: 'POST', credentials: 'include' })
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            if (d && d.success) {
+                                return fetch('/api/college-list', { credentials: 'include' }).then(function(r2) { return r2.json(); });
+                            }
+                        })
+                        .then(function(fresh) {
+                            if (fresh && fresh.list && Array.isArray(fresh.list)) renderDashboardCollegeList(fresh.list);
+                        })
+                        .catch(function() {});
+                }
+            } catch (e) {
+                console.error(e);
+                listEl.innerHTML = '<li class="dashboard-college-item"><span class="dashboard-college-dates empty">Could not load college list.</span></li>';
+            }
+        }
+        function escapeHtml(s) {
+            var div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+        function parseDeadlineDate(str) {
+            if (!str || typeof str !== 'string') return null;
+            var s = str.trim();
+            if (!s) return null;
+            var d = new Date(s);
+            if (isNaN(d.getTime())) return null;
+            return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+        }
+        function getDeadlinesOnDay(year, month, day) {
+            var out = [];
+            var list = dashboardCollegeList || [];
+            for (var i = 0; i < list.length; i++) {
+                var c = list[i];
+                var name = (c && c.name) ? String(c.name).trim() : '';
+                if (!name) continue;
+                var rea = (c.rea != null) ? String(c.rea).trim() : '';
+                var ea = (c.ea != null) ? String(c.ea).trim() : '';
+                var ed = (c.ed != null) ? String(c.ed).trim() : '';
+                var rd = (c.rd != null) ? String(c.rd).trim() : '';
+                if (rea) { var p = parseDeadlineDate(rea); if (p && p.year === year && p.month === month && p.day === day) out.push(escapeHtml(name) + ': REA'); }
+                if (ea) { var p = parseDeadlineDate(ea); if (p && p.year === year && p.month === month && p.day === day) out.push(escapeHtml(name) + ': EA'); }
+                if (ed) { var p = parseDeadlineDate(ed); if (p && p.year === year && p.month === month && p.day === day) out.push(escapeHtml(name) + ': ED'); }
+                if (rd) { var p = parseDeadlineDate(rd); if (p && p.year === year && p.month === month && p.day === day) out.push(escapeHtml(name) + ': RD'); }
+            }
+            return out;
+        }
+        function initDashboardCalendar() {
+            const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            let viewDate = new Date();
+            const titleEl = document.getElementById('dashboardCalendarTitle');
+            const daysEl = document.getElementById('dashboardCalendarDays');
+            const prevBtn = document.getElementById('dashboardCalPrev');
+            const nextBtn = document.getElementById('dashboardCalNext');
+            if (!titleEl || !daysEl) return;
+            function toDateKey(y, m, d) {
+                var mm = String(m + 1); var dd = String(d);
+                return y + '-' + (mm.length === 1 ? '0' + mm : mm) + '-' + (dd.length === 1 ? '0' + dd : dd);
+            }
+            function noteIndicatorHtml(year, month, day) {
+                var notes = window.dashboardDateNotes;
+                if (!notes || typeof notes !== 'object') return '';
+                var key = toDateKey(year, month, day);
+                var note = notes[key];
+                if (!note || typeof note !== 'string' || !note.trim()) return '';
+                var title = note.length > 200 ? note.substring(0, 197) + '...' : note;
+                var preview = note.length > 25 ? note.substring(0, 22).trim() + '…' : note.trim();
+                return '<div class="day-note-indicator" title="' + escapeHtml(title) + '">' + escapeHtml(preview) + '</div>';
+            }
+            function render() {
+                const year = viewDate.getFullYear();
+                const month = viewDate.getMonth();
+                titleEl.textContent = MONTHS[month] + ' ' + year;
+                const first = new Date(year, month, 1);
+                const last = new Date(year, month + 1, 0);
+                const startDay = first.getDay();
+                const daysInMonth = last.getDate();
+                const prevMonth = new Date(year, month, 0);
+                const prevDays = prevMonth.getDate();
+                const prevMonthNum = prevMonth.getMonth();
+                const prevYear = prevMonth.getFullYear();
+                let html = '';
+                for (let i = 0; i < startDay; i++) {
+                    const d = prevDays - startDay + 1 + i;
+                    var events = getDeadlinesOnDay(prevYear, prevMonthNum, d);
+                    var eventsHtml = events.length ? '<div class="day-events">' + events.map(function(e) { return '<span>' + e + '</span>'; }).join('') + '</div>' : '';
+                    html += '<span class="dashboard-calendar-day other-month" data-year="' + prevYear + '" data-month="' + prevMonthNum + '" data-day="' + d + '"><span class="day-num">' + d + '</span>' + noteIndicatorHtml(prevYear, prevMonthNum, d) + eventsHtml + '</span>';
+                }
+                const today = new Date();
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+                    var events = getDeadlinesOnDay(year, month, d);
+                    var eventsHtml = events.length ? '<div class="day-events">' + events.map(function(e) { return '<span>' + e + '</span>'; }).join('') + '</div>' : '';
+                    html += '<span class="dashboard-calendar-day' + (isToday ? ' today' : '') + '" data-year="' + year + '" data-month="' + month + '" data-day="' + d + '"><span class="day-num">' + d + '</span>' + noteIndicatorHtml(year, month, d) + eventsHtml + '</span>';
+                }
+                const totalCells = startDay + daysInMonth;
+                const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+                const nextMonth = new Date(year, month + 1, 1);
+                const nextMonthNum = nextMonth.getMonth();
+                const nextYear = nextMonth.getFullYear();
+                for (let i = 0; i < remaining; i++) {
+                    const d = i + 1;
+                    var events = getDeadlinesOnDay(nextYear, nextMonthNum, d);
+                    var eventsHtml = events.length ? '<div class="day-events">' + events.map(function(e) { return '<span>' + e + '</span>'; }).join('') + '</div>' : '';
+                    html += '<span class="dashboard-calendar-day other-month" data-year="' + nextYear + '" data-month="' + nextMonthNum + '" data-day="' + d + '"><span class="day-num">' + d + '</span>' + noteIndicatorHtml(nextYear, nextMonthNum, d) + eventsHtml + '</span>';
+                }
+                daysEl.innerHTML = html;
+            }
+            window.dashboardCalendarRender = render;
+            var modal = document.getElementById('dashboardDateModal');
+            var modalTitle = document.getElementById('dashboardDateModalTitle');
+            var modalEvents = document.getElementById('dashboardDateModalEvents');
+            var modalEmpty = document.getElementById('dashboardDateModalEmpty');
+            var modalNotes = document.getElementById('dashboardDateModalNotes');
+            var modalClose = document.getElementById('dashboardDateModalClose');
+            var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            function dateKey(year, month, day) {
+                var m = String(month + 1); var d = String(day);
+                return year + '-' + (m.length === 1 ? '0' + m : m) + '-' + (d.length === 1 ? '0' + d : d);
+            }
+            var currentModalDateKey = null;
+            function saveCurrentNote() {
+                if (!currentModalDateKey || !modalNotes) return;
+                var note = modalNotes.value.trim();
+                if (!window.dashboardDateNotes) window.dashboardDateNotes = {};
+                window.dashboardDateNotes[currentModalDateKey] = note;
+                fetch('/api/date-notes', {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: currentModalDateKey, note: note })
+                }).catch(function() {});
+                if (window.dashboardCalendarRender) window.dashboardCalendarRender();
+            }
+            function openDateModal(year, month, day) {
+                saveCurrentNote();
+                currentModalDateKey = dateKey(year, month, day);
+                var d = new Date(year, month, day);
+                var dayName = DAY_NAMES[d.getDay()];
+                var monthName = MONTHS[month];
+                modalTitle.textContent = dayName + ', ' + monthName + ' ' + day + ', ' + year;
+                var events = getDeadlinesOnDay(year, month, day);
+                if (events.length) {
+                    modalEmpty.style.display = 'none';
+                    modalEvents.style.display = '';
+                    modalEvents.innerHTML = events.map(function(e) { return '<li>' + e + '</li>'; }).join('');
+                } else {
+                    modalEvents.style.display = 'none';
+                    modalEmpty.style.display = 'block';
+                }
+                if (modalNotes) modalNotes.value = (window.dashboardDateNotes && window.dashboardDateNotes[currentModalDateKey]) || '';
+                modal.classList.add('open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+            function closeDateModal() {
+                saveCurrentNote();
+                currentModalDateKey = null;
+                modal.classList.remove('open');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+            if (modalNotes) modalNotes.addEventListener('blur', saveCurrentNote);
+            daysEl.addEventListener('click', function(ev) {
+                var cell = ev.target.closest('.dashboard-calendar-day');
+                if (!cell) return;
+                var y = parseInt(cell.getAttribute('data-year'), 10);
+                var m = parseInt(cell.getAttribute('data-month'), 10);
+                var d = parseInt(cell.getAttribute('data-day'), 10);
+                if (!isNaN(y) && !isNaN(m) && !isNaN(d)) openDateModal(y, m, d);
+            });
+            if (modalClose) modalClose.addEventListener('click', closeDateModal);
+            modal.addEventListener('click', function(ev) {
+                if (ev.target === modal) closeDateModal();
+            });
+            document.addEventListener('keydown', function(ev) {
+                if (ev.key === 'Escape' && modal.classList.contains('open')) closeDateModal();
+            });
+            function renderWithTransition() {
+                const daysEl = document.getElementById('dashboardCalendarDays');
+                if (daysEl) {
+                    daysEl.classList.add('calendar-transition');
+                    setTimeout(function() {
+                        render();
+                        requestAnimationFrame(function() {
+                            requestAnimationFrame(function() { daysEl.classList.remove('calendar-transition'); });
+                        });
+                    }, 180);
+                } else {
+                    render();
+                }
+            }
+            prevBtn.addEventListener('click', function() {
+                viewDate.setMonth(viewDate.getMonth() - 1);
+                renderWithTransition();
+            });
+            nextBtn.addEventListener('click', function() {
+                viewDate.setMonth(viewDate.getMonth() + 1);
+                renderWithTransition();
+            });
+            render();
+        }
+    </script>
+    <script src="/nav-modules.js"></script>
+    <script src="/chat-widget.js"></script>
+</body>
+</html>

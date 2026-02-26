@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Questions - Pathwise Admin</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
         .admin-container {
             background: white;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
             max-width: 1000px;
             margin: 0 auto;
         }
@@ -20,12 +20,12 @@
         }
 
         .admin-header h1 {
-            color: #667eea;
+            color: #4285F4;
             margin-bottom: 10px;
         }
 
         .question-editor {
-            border: 2px solid #e0e0e0;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
@@ -37,8 +37,8 @@
         }
 
         .question-editor.reorder-drop-target {
-            border-color: #667eea;
-            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+            border-color: rgba(66, 133, 244, 0.5);
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
         }
 
         .reorder-handle {
@@ -110,7 +110,7 @@
         .form-group select {
             width: 100%;
             padding: 10px;
-            border: 2px solid #e0e0e0;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 6px;
             font-size: 1rem;
         }
@@ -119,7 +119,7 @@
         .form-group textarea:focus,
         .form-group select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #4285F4;
         }
 
         .options-input {
@@ -138,7 +138,7 @@
 
         .option-tag {
             display: inline-block;
-            background: #667eea;
+            background: #4285F4;
             color: white;
             padding: 5px 12px;
             border-radius: 20px;
@@ -191,7 +191,7 @@
         }
 
         .add-question-btn {
-            background: #667eea;
+            background: #4285F4;
             color: white;
             border: none;
             padding: 12px 24px;
@@ -238,7 +238,7 @@
         }
 
         .message-item {
-            border: 2px solid #e0e0e0;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 15px;
@@ -247,21 +247,195 @@
 
         .message-item h4 {
             margin-top: 0;
-            color: #667eea;
+            color: #4285F4;
         }
 
         .delay-input {
             width: 150px;
         }
+
+        .placeholders-ref {
+            margin-bottom: 24px;
+            padding: 16px 20px;
+            background: #f0f4ff;
+            border: 1px solid #c5d4f7;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .placeholders-ref summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #333;
+            user-select: none;
+        }
+        .placeholders-ref table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        .placeholders-ref th, .placeholders-ref td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid #e9e5ff;
+            vertical-align: top;
+        }
+        .placeholders-ref th { background: #e0e8f8; color: #333; font-size: 0.85rem; }
+        .placeholders-ref code { background: #e8ecf4; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        .placeholders-ref ul { margin: 4px 0 0 0; padding-left: 18px; }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="admin-nav" style="margin-bottom: 24px;">
+            <a href="/admin.html" style="margin-right: 16px; color: #4285F4;">Edit Questions</a>
+            <a href="/admin-modules.html" style="margin-right: 16px; color: #4285F4;">Edit Modules</a>
+            <a href="/documents.html" style="margin-right: 16px; color: #4285F4;">Documents</a>
+        </div>
         <div class="admin-container">
             <div class="admin-header">
                 <h1>Edit Questions</h1>
                 <p>Manage your questionnaire questions here. Changes are saved to the server.</p>
             </div>
+
+            <!-- College features: AI provider -->
+            <div class="admin-section" style="margin-bottom: 24px; padding: 20px; background: #f0f4ff; border-radius: 8px; border: 1px solid #e9e5ff;">
+                <h3 style="margin-top: 0; color: #4285F4;">College features – AI provider</h3>
+                <p style="color: #555; font-size: 0.9em; margin-bottom: 16px;">Choose which AI to use for Module 1 college search and details. ChatGPT (OpenAI) is typically cheaper; Claude can give higher-quality blurbs.</p>
+                <div class="form-group" style="max-width: 480px;">
+                    <label for="settingCollegeNameMatch">College search (name match)</label>
+                    <select id="settingCollegeNameMatch" style="padding: 8px 12px; border-radius: 6px; font-size: 1rem;">
+                        <option value="openai">ChatGPT (OpenAI)</option>
+                        <option value="claude">Claude</option>
+                    </select>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 4px;">Suggestions as the user types and resolving the typed name to an official college name.</p>
+                </div>
+                <div class="form-group" style="max-width: 480px;">
+                    <label for="settingCollegeBlurb">Blurb when adding to list</label>
+                    <select id="settingCollegeBlurb" style="padding: 8px 12px; border-radius: 6px; font-size: 1rem;">
+                        <option value="openai">ChatGPT (OpenAI)</option>
+                        <option value="claude">Claude</option>
+                    </select>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 4px;">One short sentence explaining why the college is a good fit (uses Module 0 answers).</p>
+                </div>
+                <div class="form-group" style="max-width: 480px;">
+                    <label for="settingCollegeDetails">More info (description)</label>
+                    <select id="settingCollegeDetails" style="padding: 8px 12px; border-radius: 6px; font-size: 1rem;">
+                        <option value="openai">ChatGPT (OpenAI)</option>
+                        <option value="claude">Claude</option>
+                    </select>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 4px;">Description shown when the user clicks “More info” on a college.</p>
+                </div>
+                <button type="button" id="saveSettingsBtn" class="save-all-btn" style="background: #4285F4;">Save AI settings</button>
+                <span id="settingsSaveStatus" style="margin-left: 12px; font-size: 0.9rem; color: #0a0;"></span>
+            </div>
+
+            <div class="admin-section" style="margin-bottom: 24px; padding: 20px; background: #f8f5ff; border-radius: 8px; border: 1px solid #e0d8f0;">
+                <h3 style="margin-top: 0; color: #4285F4;">Promo & feature codes</h3>
+                <p style="color: #555; font-size: 0.9em; margin-bottom: 16px;">Promo codes apply a discount at checkout. Feature codes grant a plan at no charge (e.g. Premium + 1 Meeting free).</p>
+                <div id="promoCodesList" style="margin-bottom: 20px;"></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="newPromoCode">Code</label>
+                        <input type="text" id="newPromoCode" placeholder="e.g. SAVE10" style="width: 140px; padding: 8px;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="newPromoType">Type</label>
+                        <select id="newPromoType" style="padding: 8px;">
+                            <option value="promo">Promo (discount)</option>
+                            <option value="feature">Feature (grant plan free)</option>
+                        </select>
+                    </div>
+                    <div class="form-group promo-only" style="margin: 0;">
+                        <label for="newPromoDiscountPercent">Discount %</label>
+                        <input type="number" id="newPromoDiscountPercent" min="0" max="100" placeholder="10" style="width: 80px; padding: 8px;">
+                    </div>
+                    <div class="form-group promo-only" style="margin: 0;">
+                        <label for="newPromoDiscountAmount">Discount $ (cents)</label>
+                        <input type="number" id="newPromoDiscountAmount" min="0" placeholder="500 = $5" style="width: 100px; padding: 8px;">
+                    </div>
+                    <div class="form-group feature-only" style="margin: 0; display: none;">
+                        <label for="newPromoGrantPlan">Grant plan</label>
+                        <select id="newPromoGrantPlan" style="padding: 8px;">
+                            <option value="premium">Premium Plan</option>
+                            <option value="plus-one-meeting">Premium + 1 Meeting</option>
+                            <option value="weekly-meeting">Premium + Weekly Meetings</option>
+                            <option value="one-time-meeting">One-time: 1 Meeting</option>
+                        </select>
+                    </div>
+                    <button type="button" id="addPromoCodeBtn" class="save-all-btn" style="background: #4285F4;">Add code</button>
+                </div>
+                <button type="button" id="savePromoCodesBtn" class="save-all-btn">Save promo codes</button>
+                <span id="promoCodesSaveStatus" style="margin-left: 12px; font-size: 0.9rem;"></span>
+            </div>
+
+            <details class="placeholders-ref">
+                <summary>Prompt placeholders reference – what you can use in AI prompts</summary>
+                <p style="margin: 8px 0 0 0; color: #555;">Use these in Claude prompts, API prompts (Edit Modules), RAG queries, and list prompts. The system replaces each placeholder with the actual value when calling the AI.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Placeholder</th>
+                            <th>What it becomes</th>
+                            <th>Where it works</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>{answer}</code></td>
+                            <td>The current question’s answer (this question only).</td>
+                            <td>Question Claude prompt, RAG query (what to search), post-college prompts.</td>
+                        </tr>
+                        <tr>
+                            <td><code>{allAnswers}</code></td>
+                            <td>All previous answers (question text + answer, formatted). Includes regular and post-college answers where used.</td>
+                            <td>Question Claude prompt, post-college prompts, Module 1 API prompts (safeties/targets/reaches), college list prompt.</td>
+                        </tr>
+                        <tr>
+                            <td><code>{q:questionId}</code></td>
+                            <td>One specific question’s answer. Use the question ID, e.g. <code>{q:1}</code> or <code>{q:1765772397699}</code>.</td>
+                            <td>Question Claude prompt, post-college prompts. (Question IDs are shown next to each question in the editor.)</td>
+                        </tr>
+                        <tr>
+                            <td><code>{ragResults}</code></td>
+                            <td>Search results from your uploaded documents (RAG). Filled only when this question has a RAG query set.</td>
+                            <td>Question Claude prompt (same question must have “RAG query” filled).</td>
+                        </tr>
+                        <tr>
+                            <td><code>{collegeList}</code></td>
+                            <td>The user’s saved college list: one line per college, “Name: blurb” or “Name”. Becomes “No colleges added yet.” if empty.</td>
+                            <td>Question Claude prompt, post-college prompts, Module 1 API prompts (Edit Modules → Module 1 → safeties/targets/reaches), college list / colleges-detailed prompt.</td>
+                        </tr>
+                        <tr>
+                            <td><code>{insight:<em>name</em>}</code></td>
+                            <td>Saved RAG analysis for the given variable name (e.g. <code>{insight:admittedPatterns}</code>). Set via Admin → RAG analysis → Save as variable.</td>
+                            <td>Same as <code>{studentInsights}</code> and <code>{ragResults}</code>.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="margin: 12px 0 0 0; color: #555; font-size: 0.85rem;"><strong>Where to edit what:</strong> Regular questions and post-college questions use the “Claude prompt” and “RAG query” fields on this page. Module 1 college prompts (safeties/targets/reaches) use <a href="/admin-modules.html">Edit Modules</a> → Module 1 → each page’s “API prompt”.</p>
+            </details>
+
+            <details class="rag-analysis-section" style="margin: 20px 0;">
+                <summary>RAG analysis – custom search query + module text</summary>
+                <p style="margin: 8px 0 12px 0; color: #555;">Run a search over your uploaded documents with your own query. Optionally add module/questionnaire text as context. Save the result to a <strong>variable name</strong> (e.g. <code>admittedPatterns</code>) so you can use <code>{insight:admittedPatterns}</code> in prompts. You can save multiple results to different names.</p>
+                <div class="form-group">
+                    <label for="ragAnalysisQuery">Search query (what to ask the documents)</label>
+                    <input type="text" id="ragAnalysisQuery" placeholder="e.g. What do admitted students have in common? GPA and SAT patterns?" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div class="form-group">
+                    <label for="ragAnalysisModuleText">Module text (optional – questionnaire or module content for context)</label>
+                    <textarea id="ragAnalysisModuleText" rows="4" placeholder="Paste module or question text here to frame the answer. Leave empty to use only the search query." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="ragAnalysisSaveToInsights"> Save result to a variable</label>
+                    <input type="text" id="ragAnalysisInsightName" placeholder="Variable name (e.g. admittedPatterns)" style="width: 100%; max-width: 280px; margin-left: 8px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">Use <code>{insight:<em>name</em>}</code> in prompts (e.g. <code>{insight:admittedPatterns}</code>). Leave name empty to save to legacy <code>{studentInsights}</code>.</p>
+                </div>
+                <p style="font-size: 0.9em; color: #555; margin-bottom: 8px;"><strong>Saved variables:</strong> <span id="ragSavedVariablesList">—</span></p>
+                <button type="button" class="save-all-btn" id="ragAnalysisRunBtn" style="margin-right: 10px;">Run analysis</button>
+                <div id="ragAnalysisResult" style="margin-top: 16px; display: none; padding: 16px; background: #f0f4ff; border-radius: 8px; border: 1px solid #ddd6fe; white-space: pre-wrap;"></div>
+                <div id="ragAnalysisError" style="margin-top: 8px; display: none; padding: 12px; background: #ffe8e8; border-radius: 6px; color: #c00;"></div>
+            </details>
 
             <div id="questionsList"></div>
 
@@ -278,11 +452,11 @@
 
                 <div id="postCollegeMessagesList"></div>
 
-                <button class="add-question-btn" onclick="addPostCollegeQuestion()" style="background: #667eea;">+ Add Question</button>
+                <button class="add-question-btn" onclick="addPostCollegeQuestion()" style="background: #4285F4;">+ Add Question</button>
 
                 <!-- Final Message Configuration -->
                 <div class="admin-section" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
-                    <h3 style="margin-top: 0; color: #667eea;">Final Message Before Chat Mode</h3>
+                    <h3 style="margin-top: 0; color: #4285F4;">Final Message Before Chat Mode</h3>
                     <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">This message will appear after all post-college questions are completed, before transitioning to direct Claude chat mode.</p>
                     <div class="form-group">
                         <label>Final Message Text</label>
@@ -291,7 +465,7 @@
                     </div>
                 </div>
 
-                <button class="save-all-btn" onclick="savePostCollegeMessages()" style="background: #667eea;">Save Post-College Questions</button>
+                <button class="save-all-btn" onclick="savePostCollegeMessages()" style="background: #4285F4;">Save Post-College Questions</button>
             </div>
         </div>
     </div>
@@ -377,10 +551,10 @@
                 <div class="form-group">
                     <label>Claude Prompt (Optional)</label>
                     <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for Claude when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip Claude response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
-                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to Claude after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to Claude after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results, <strong>{collegeList}</strong> for the user's saved college list. The response will appear as a separate bot message.</p>
                 </div>
-                <div class="form-group" style="background: #f0f4ff; padding: 16px; border-radius: 8px; border: 1px solid #667eea;">
-                    <label style="font-weight: 600; color: #667eea;">Text After Claude Response (Your custom text)</label>
+                <div class="form-group" style="background: #f0f4ff; padding: 16px; border-radius: 8px; border: 1px solid #4285F4;">
+                    <label style="font-weight: 600; color: #4285F4;">Text After Claude Response (Your custom text)</label>
                     <textarea class="question-text-after-claude" placeholder="Add your own text that appears after the Claude output. E.g. instructions, prompts, or follow-up content. Leave empty for none." rows="4" style="margin-top: 8px; width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">${escapeHtml(question.textAfterClaude || '')}</textarea>
                     <p style="color: #666; font-size: 0.85em; margin-top: 8px;">This text is shown immediately after the Claude response. You (the admin) add it here.</p>
                 </div>
@@ -929,10 +1103,10 @@
                 <div class="form-group">
                     <label>Claude Prompt (Optional)</label>
                     <textarea class="question-chat-prompt" placeholder="Enter a custom prompt for Claude when this question is answered. Use {answer} for current answer, {allAnswers} for all previous answers, {q:questionId} for a specific question's answer, {ragResults} for RAG search results. Leave empty to skip Claude response." rows="3">${escapeHtml(question.chatPrompt || '')}</textarea>
-                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to Claude after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results. The response will appear as a separate bot message.</p>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 5px;">This prompt will be sent to Claude after the user answers this question. Use <strong>{answer}</strong> for the current answer, <strong>{allAnswers}</strong> for all previous answers, <strong>{q:questionId}</strong> for a specific question's answer (e.g., {q:q1}), <strong>{ragResults}</strong> for RAG search results, <strong>{collegeList}</strong> for the user's saved college list. The response will appear as a separate bot message.</p>
                 </div>
-                <div class="form-group" style="background: #f0f4ff; padding: 16px; border-radius: 8px; border: 1px solid #667eea;">
-                    <label style="font-weight: 600; color: #667eea;">Text After Claude Response (Your custom text)</label>
+                <div class="form-group" style="background: #f0f4ff; padding: 16px; border-radius: 8px; border: 1px solid #4285F4;">
+                    <label style="font-weight: 600; color: #4285F4;">Text After Claude Response (Your custom text)</label>
                     <textarea class="question-text-after-claude" placeholder="Add your own text that appears after the Claude output. E.g. instructions, prompts, or follow-up content. Leave empty for none." rows="4" style="margin-top: 8px; width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">${escapeHtml(question.textAfterClaude || '')}</textarea>
                     <p style="color: #666; font-size: 0.85em; margin-top: 8px;">This text is shown immediately after the Claude response. You (the admin) add it here.</p>
                 </div>
@@ -1368,11 +1542,200 @@
             }
         }
 
+        // College AI settings
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings', { credentials: 'include' });
+                const s = await res.json();
+                if (s && typeof s === 'object' && !s.error) {
+                    const sel = (id, val) => { const el = document.getElementById(id); if (el && (val === 'openai' || val === 'claude')) el.value = val; };
+                    sel('settingCollegeNameMatch', s.collegeNameMatch);
+                    sel('settingCollegeBlurb', s.collegeBlurb);
+                    sel('settingCollegeDetails', s.collegeDetails);
+                    updateRagSavedVariablesList(s.ragInsights);
+                    if (Array.isArray(s.promoCodes)) promoCodesList = s.promoCodes.slice();
+                    renderPromoCodesList();
+                }
+            } catch (e) { console.error('Load settings error:', e); }
+        }
+        let promoCodesList = [];
+        const PLAN_LABELS = { premium: 'Premium Plan', 'plus-one-meeting': 'Premium + 1 Meeting', 'weekly-meeting': 'Premium + Weekly Meetings', 'one-time-meeting': 'One-time: 1 Meeting' };
+        function renderPromoCodesList() {
+            const el = document.getElementById('promoCodesList');
+            if (!el) return;
+            if (promoCodesList.length === 0) {
+                el.innerHTML = '<p style="color: #666;">No codes yet. Add one below.</p>';
+                return;
+            }
+            el.innerHTML = '<table style="width: 100%; border-collapse: collapse;"><thead><tr><th>Code</th><th>Type</th><th>Discount / Grant</th><th></th></tr></thead><tbody></tbody></table>';
+            const tbody = el.querySelector('tbody');
+            promoCodesList.forEach((c, i) => {
+                const tr = document.createElement('tr');
+                let detail = '';
+                if (c.type === 'feature' && c.grantPlan) detail = PLAN_LABELS[c.grantPlan] || c.grantPlan;
+                else if (c.type === 'promo') {
+                    if (c.discountPercent) detail = c.discountPercent + '% off';
+                    if (c.discountAmount) detail += (detail ? ', ' : '') + '$' + (c.discountAmount / 100).toFixed(2) + ' off';
+                    if (!detail) detail = '—';
+                }
+                tr.innerHTML = '<td><code>' + escapeHtml(c.code || '') + '</code></td><td>' + (c.type || 'promo') + '</td><td>' + escapeHtml(detail) + '</td><td><button type="button" class="btn-danger" data-remove-index="' + i + '" style="padding: 4px 10px; font-size: 0.85rem;">Remove</button></td>';
+                tbody.appendChild(tr);
+            });
+            tbody.querySelectorAll('[data-remove-index]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.removeIndex, 10);
+                    promoCodesList.splice(idx, 1);
+                    renderPromoCodesList();
+                });
+            });
+        }
+        document.getElementById('newPromoType')?.addEventListener('change', function() {
+            const isFeature = this.value === 'feature';
+            document.querySelectorAll('.promo-only').forEach(el => { el.style.display = isFeature ? 'none' : 'block'; });
+            document.querySelectorAll('.feature-only').forEach(el => { el.style.display = isFeature ? 'block' : 'none'; });
+        });
+        document.getElementById('addPromoCodeBtn')?.addEventListener('click', () => {
+            const code = (document.getElementById('newPromoCode')?.value || '').trim().toUpperCase();
+            const type = document.getElementById('newPromoType')?.value || 'promo';
+            if (!code) { alert('Enter a code.'); return; }
+            const entry = { code, type };
+            if (type === 'promo') {
+                const pct = parseInt(document.getElementById('newPromoDiscountPercent')?.value, 10);
+                const amt = parseInt(document.getElementById('newPromoDiscountAmount')?.value, 10);
+                if (!isNaN(pct) && pct > 0) entry.discountPercent = pct;
+                if (!isNaN(amt) && amt > 0) entry.discountAmount = amt;
+            } else {
+                entry.grantPlan = document.getElementById('newPromoGrantPlan')?.value || 'premium';
+            }
+            promoCodesList.push(entry);
+            renderPromoCodesList();
+            document.getElementById('newPromoCode').value = '';
+        });
+        document.getElementById('savePromoCodesBtn')?.addEventListener('click', async () => {
+            const status = document.getElementById('promoCodesSaveStatus');
+            const btn = document.getElementById('savePromoCodesBtn');
+            if (btn) btn.disabled = true;
+            status.textContent = '';
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ promoCodes: promoCodesList })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    status.textContent = 'Saved.';
+                    status.style.color = '#0a0';
+                } else {
+                    status.textContent = data.message || 'Save failed';
+                    status.style.color = '#c00';
+                }
+            } catch (e) {
+                status.textContent = 'Error saving';
+                status.style.color = '#c00';
+            }
+            if (btn) btn.disabled = false;
+        });
+        function updateRagSavedVariablesList(ragInsights) {
+            const el = document.getElementById('ragSavedVariablesList');
+            if (!el) return;
+            const names = ragInsights && typeof ragInsights === 'object' && !Array.isArray(ragInsights) ? Object.keys(ragInsights) : [];
+            el.textContent = names.length ? names.map(n => '«' + n + '»').join(', ') : '—';
+        }
+        async function saveSettings() {
+            const btn = document.getElementById('saveSettingsBtn');
+            const status = document.getElementById('settingsSaveStatus');
+            if (btn) btn.disabled = true;
+            if (status) status.textContent = '';
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        collegeNameMatch: document.getElementById('settingCollegeNameMatch')?.value || 'openai',
+                        collegeBlurb: document.getElementById('settingCollegeBlurb')?.value || 'claude',
+                        collegeDetails: document.getElementById('settingCollegeDetails')?.value || 'openai'
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    if (status) { status.textContent = 'Saved.'; status.style.color = '#0a0'; }
+                } else {
+                    if (status) { status.textContent = data.message || 'Save failed'; status.style.color = '#c00'; }
+                }
+            } catch (e) {
+                if (status) { status.textContent = 'Error saving'; status.style.color = '#c00'; }
+                console.error('Save settings error:', e);
+            }
+            if (btn) btn.disabled = false;
+        }
+
+        async function runRagAnalysis() {
+            const queryEl = document.getElementById('ragAnalysisQuery');
+            const moduleTextEl = document.getElementById('ragAnalysisModuleText');
+            const saveToInsightsEl = document.getElementById('ragAnalysisSaveToInsights');
+            const resultEl = document.getElementById('ragAnalysisResult');
+            const errorEl = document.getElementById('ragAnalysisError');
+            const btn = document.getElementById('ragAnalysisRunBtn');
+            const query = (queryEl?.value || '').trim();
+            if (!query) {
+                if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = 'Enter a search query.'; }
+                if (resultEl) resultEl.style.display = 'none';
+                return;
+            }
+            if (errorEl) errorEl.style.display = 'none';
+            if (resultEl) resultEl.style.display = 'none';
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch('/api/rag/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        query,
+                        moduleText: (moduleTextEl?.value || '').trim(),
+                        saveToInsights: !!saveToInsightsEl?.checked
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.success !== false) {
+                    if (resultEl) {
+                        let suffix = '';
+                        if (data.savedToInsights) suffix = data.savedToVariable ? '\n\n[Saved to variable: ' + data.savedToVariable + ']' : '\n\n[Saved to Student insights]';
+                        resultEl.textContent = (data.answer || data.message || '') + suffix;
+                        resultEl.style.display = 'block';
+                    }
+                    if (data.savedToInsights) {
+                        const res2 = await fetch('/api/settings', { credentials: 'include' });
+                        const s2 = await res2.json();
+                        if (s2 && s2.ragInsights) updateRagSavedVariablesList(s2.ragInsights);
+                    }
+                } else {
+                    if (errorEl) {
+                        errorEl.textContent = data.message || 'Analysis failed';
+                        errorEl.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                if (errorEl) {
+                    errorEl.textContent = 'Request failed: ' + (e.message || 'Unknown error');
+                    errorEl.style.display = 'block';
+                }
+                console.error('RAG analyze error:', e);
+            }
+            if (btn) btn.disabled = false;
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             setupQuestionsListDragDrop();
             loadQuestions();
             loadPostCollegeMessages();
+            loadSettings();
+            document.getElementById('saveSettingsBtn')?.addEventListener('click', saveSettings);
+            document.getElementById('ragAnalysisRunBtn')?.addEventListener('click', runRagAnalysis);
         });
     </script>
 </body>

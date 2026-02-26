@@ -1,5 +1,6 @@
-// Load environment variables from .env file
-require('dotenv').config();
+// Load environment variables from .env file (from app directory so it works regardless of cwd)
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const express = require('express');
 const cors = require('cors');
@@ -8,7 +9,8 @@ const session = require('express-session');
 const multer = require('multer');
 const crypto = require('crypto');
 const fs = require('fs');
-const path = require('path');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 // Import MongoDB database functions
 const db = require('./db');
@@ -38,14 +40,27 @@ const upload = multer({
   }
 });
 
-// Ensure uploads directory exists
+// Multer for resume/transcript (Module 0 auto-fill): PDF, TXT, or DOCX
+const uploadResume = multer({
+  dest: 'uploads/resume/',
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const ok = file.mimetype === 'application/pdf' || file.mimetype === 'text/plain' || file.mimetype === docxMime ||
+      (file.originalname && /\.(pdf|txt|docx)$/i.test(file.originalname));
+    if (ok) cb(null, true);
+    else cb(new Error('Only PDF, TXT, or DOCX files are allowed'), false);
+  }
+});
+
+// Ensure uploads directories exist
 const UPLOADS_DIR = path.join(__dirname, 'uploads', 'documents');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+const UPLOADS_RESUME_DIR = path.join(__dirname, 'uploads', 'resume');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+if (!fs.existsSync(UPLOADS_RESUME_DIR)) fs.mkdirSync(UPLOADS_RESUME_DIR, { recursive: true });
 
 // Initialize LLM: Claude (Anthropic) or OpenAI - prefers Claude when ANTHROPIC_API_KEY set
-const { hasLLM, chatComplete, chatCompleteWithMessages, openai } = require('./llm');
+const { hasLLM, hasOpenAIChat, chatComplete, chatCompleteWithMessages, openaiChatComplete, openai } = require('./llm');
 
 // Initialize RAG System (requires OpenAI for embeddings; chat can use Claude)
 const { VectorStore, DocumentProcessor, RAGQueryHandler } = require('./rag-system');
@@ -86,15 +101,1003 @@ app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), (req
   else res.status(500).send('Webhook handler not ready');
 });
 app.use(bodyParser.json());
-// Serve payment page route BEFORE static files
+
+// Module pages: use a dedicated router so /module/* is never confused with static or catch-all
+const questionnairePath = path.join(__dirname, 'public', 'questionnaire.html');
+const moduleRouter = express.Router();
+moduleRouter.get('/:moduleId', (req, res) => {
+  if (!fs.existsSync(questionnairePath)) {
+    return res.status(500).send('questionnaire.html not found');
+  }
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(questionnairePath);
+});
+app.use('/module', moduleRouter);
+
+app.get('/questionnaire.html', (req, res) => {
+  const moduleId = req.query.module || 'module-0';
+  res.redirect(302, '/module/' + encodeURIComponent(moduleId));
+});
+
+// Dashboard and other HTML pages (before express.static)
+const dashboardPath = path.join(__dirname, 'public', 'dashboard.html');
+app.get('/dashboard', (req, res) => {
+  if (!fs.existsSync(dashboardPath)) return res.status(404).send('Dashboard not found');
+  res.sendFile(dashboardPath);
+});
+app.get('/favicon.ico', (req, res) => {
+  res.redirect(302, '/favicon.svg');
+});
+app.get('/modules', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'modules.html'));
+});
+app.get('/counselor', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'counselor.html'));
+});
 app.get('/payment', (req, res) => {
-  console.log('=== PAYMENT ROUTE HIT ===');
   const filePath = path.join(__dirname, 'public', 'payment.html');
-  console.log('File path:', filePath);
   if (!fs.existsSync(filePath)) {
     return res.status(404).send('Payment page not found');
   }
   res.sendFile(filePath);
+});
+
+// API routes that must be registered before express.static (to avoid 404 from catch-all)
+app.get('/api/course', (req, res) => {
+  try {
+    const COURSE_FILE = path.join(__dirname, 'data', 'course.json');
+    if (!fs.existsSync(COURSE_FILE)) {
+      return res.json({ title: 'Pathwise', modules: [] });
+    }
+    const data = fs.readFileSync(COURSE_FILE, 'utf8');
+    const course = JSON.parse(data);
+    res.json(course);
+  } catch (error) {
+    console.error('Error loading course:', error);
+    res.status(500).json({ error: 'Failed to load course' });
+  }
+});
+
+// College Match API (Module 1) - register before express.static so they are never 404'd
+const requireLoginEarly = (req, res, next) => {
+  if (req.session && req.session.userId) return next();
+  res.status(401).json({ success: false, message: 'Please log in to access this resource' });
+};
+app.get('/api/college-list', requireLoginEarly, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    const list = (user && user.collegeList && Array.isArray(user.collegeList)) ? user.collegeList : [];
+    res.json({ success: true, list });
+  } catch (e) {
+    console.error('Get college list error:', e);
+    res.status(500).json({ success: false, message: 'Failed to load college list.' });
+  }
+});
+// More specific path must be registered before POST /api/college-list
+app.post('/api/college-list/refresh-dates', requireLoginEarly, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    let list = (user && user.collegeList && Array.isArray(user.collegeList)) ? [...user.collegeList] : [];
+    for (let i = 0; i < list.length; i++) {
+      const name = (list[i].name || '').trim();
+      if (!name) continue;
+      const dates = await fetchCollegeDatesOnly(name, req.session.userId);
+      list[i] = { ...list[i], rea: dates.rea, ea: dates.ea, ed: dates.ed, rd: dates.rd };
+    }
+    await db.updateUser(req.session.userId, { collegeList: list });
+    res.json({ success: true, list });
+  } catch (e) {
+    console.error('Refresh college list dates error:', e);
+    res.status(500).json({ success: false, message: 'Failed to refresh dates.' });
+  }
+});
+app.post('/api/college-list', requireLoginEarly, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    let list = (user && user.collegeList && Array.isArray(user.collegeList)) ? [...user.collegeList] : [];
+    const { add, remove, resolveName } = req.body || {};
+    if (add && add.name && typeof add.name === 'string') {
+      let name = add.name.trim();
+      if (name) {
+        if (resolveName === true && name.length >= 2) {
+          const abbrevMap = {
+            umich: 'University of Michigan',
+            ucla: 'University of California, Los Angeles',
+            ucb: 'University of California, Berkeley',
+            usc: 'University of Southern California',
+            unc: 'University of North Carolina at Chapel Hill',
+            uva: 'University of Virginia',
+            uf: 'University of Florida',
+            ut: 'University of Texas at Austin',
+            osu: 'Ohio State University',
+            uga: 'University of Georgia',
+            fsu: 'Florida State University',
+            ucf: 'University of Central Florida',
+            byu: 'Brigham Young University',
+            mit: 'Massachusetts Institute of Technology',
+            nyu: 'New York University',
+            gtech: 'Georgia Institute of Technology',
+            gt: 'Georgia Institute of Technology'
+          };
+          const lower = name.toLowerCase().trim();
+          if (abbrevMap[lower]) {
+            name = abbrevMap[lower];
+          } else if (hasOpenAIChat || hasLLM) {
+            try {
+              const useOpenAI = hasOpenAIChat;
+              const resolvePrompt = `Resolve to full official US college/university name. If "${name}" is an abbreviation or nickname (e.g. umich, UCLA, USC), return a JSON array with the full official name first, e.g. ["University of Michigan"]. Otherwise return colleges whose full name starts with or contains "${name}". Return ONLY a JSON array of strings. Put the single best match first. No markdown.`;
+              const raw = useOpenAI
+                ? (await openaiChatComplete('You are a college counselor. Reply with ONLY a valid JSON array of college/university full official names. No other text.', resolvePrompt, { maxTokens: 512, temperature: 0.3 }) || '')
+                : (await chatComplete('You are a college counselor. Reply with ONLY a valid JSON array of college/university full official names. No other text.', resolvePrompt, { maxTokens: 512, temperature: 0.3 }) || '');
+              const jsonStr = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+              let arr = [];
+              try {
+                const parsed = JSON.parse(jsonStr);
+                if (Array.isArray(parsed)) {
+                  arr = parsed
+                    .map(s => typeof s === 'string' ? s.trim() : (s && typeof s.name === 'string' ? s.name.trim() : ''))
+                    .filter(Boolean)
+                    .slice(0, 15);
+                }
+              } catch (_) {
+                const m = raw.match(/\[[\s\S]*\]/);
+                if (m) try {
+                  const fb = JSON.parse(m[0]);
+                  if (Array.isArray(fb)) arr = fb.map(s => typeof s === 'string' ? s.trim() : (s && s.name ? s.name.trim() : '')).filter(Boolean).slice(0, 15);
+                } catch (__) {}
+              }
+              if (arr.length > 0) {
+                const exact = arr.find(s => s.toLowerCase() === name.toLowerCase());
+                name = exact || arr[0];
+              }
+            } catch (_) {}
+          }
+        }
+        if (list.some(c => (c.name || '').trim().toLowerCase() === name.toLowerCase())) {
+          await db.updateUser(req.session.userId, { collegeList: list });
+          return res.json({ success: true, list, alreadyAdded: true });
+        }
+        list.push({ name, blurb: typeof add.blurb === 'string' ? add.blurb.trim() : '' });
+      }
+    } else if (remove && typeof remove === 'string') {
+      const name = remove.trim();
+      list = list.filter(c => c.name !== name);
+    }
+    await db.updateUser(req.session.userId, { collegeList: list });
+    res.json({ success: true, list });
+  } catch (e) {
+    console.error('Update college list error:', e);
+    res.status(500).json({ success: false, message: 'Failed to update college list.' });
+  }
+});
+
+// Calendar date notes (per-date notes on dashboard calendar)
+app.get('/api/date-notes', requireLoginEarly, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    const notes = (user && user.dateNotes && typeof user.dateNotes === 'object') ? user.dateNotes : {};
+    res.json({ notes });
+  } catch (e) {
+    console.error('Get date notes error:', e);
+    res.status(500).json({ notes: {} });
+  }
+});
+
+app.put('/api/date-notes', requireLoginEarly, async (req, res) => {
+  try {
+    const { date, note } = req.body || {};
+    const dateKey = typeof date === 'string' ? date.trim() : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+    const noteStr = typeof note === 'string' ? note : String(note ?? '');
+    const update = { ['dateNotes.' + dateKey]: noteStr };
+    await db.updateUser(req.session.userId, update);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Save date note error:', e);
+    res.status(500).json({ success: false, message: 'Failed to save note.' });
+  }
+});
+
+// Fetch only rea/ea/ed/rd for a college (used by refresh-dates). Optional userId to use student's application cycle.
+async function fetchCollegeDatesOnly(name, userId) {
+  const settings = getAppSettings();
+  const useOpenAI = (settings.collegeDetails || 'openai') === 'openai';
+  if (useOpenAI && !hasOpenAIChat) return { rea: '', ea: '', ed: '', rd: '' };
+  if (!useOpenAI && !hasLLM) return { rea: '', ea: '', ed: '', rd: '' };
+  let cycleInstruction = '';
+  if (userId) {
+    const cycle = await getApplicationCycleForUser(userId);
+    if (cycle) {
+      cycleInstruction = ` Use the application cycle "${cycle}" for deadline years: ED/EA/REA typically fall of the first year (e.g. November), RD typically January of the second year. If official dates for this cycle are not yet published, predict them based on the college's usual pattern. `;
+    }
+  }
+  const prompt = `For the college/university "${name}", return ONLY a JSON object with these keys: "rea", "ea", "ed", "rd". Each value: deadline with year (e.g. "November 1, 2027") or "Not offered".${cycleInstruction}No other text.`;
+  const raw = useOpenAI && hasOpenAIChat
+    ? (await openaiChatComplete('You are a college counselor. Reply with ONLY a valid JSON object. No other text, no markdown.', prompt, { maxTokens: 256, temperature: 0.3 }) || '')
+    : (await chatComplete('You are a college counselor. Reply with ONLY a valid JSON object. No other text, no markdown.', prompt, { maxTokens: 256, temperature: 0.3 }) || '');
+  const str = (raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  let rea = '', ea = '', ed = '', rd = '';
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed && typeof parsed === 'object') {
+      rea = (parsed.rea != null && String(parsed.rea).trim()) ? String(parsed.rea).trim() : '';
+      ea = (parsed.ea != null && String(parsed.ea).trim()) ? String(parsed.ea).trim() : '';
+      ed = (parsed.ed != null && String(parsed.ed).trim()) ? String(parsed.ed).trim() : '';
+      rd = (parsed.rd != null && String(parsed.rd).trim()) ? String(parsed.rd).trim() : '';
+    }
+  } catch (_) {}
+  return { rea, ea, ed, rd };
+}
+
+app.get('/api/college-details', requireLoginEarly, async (req, res) => {
+  try {
+    const name = (req.query.name || '').trim();
+    const blurbOnly = req.query.blurbOnly === '1' || req.query.blurbOnly === 'true';
+    if (!name) return res.status(400).json({ success: false, message: 'College name is required.' });
+    const settings = getAppSettings();
+    if (blurbOnly) {
+      const useClaudeForBlurb = (settings.collegeBlurb || 'claude') === 'claude';
+      if (useClaudeForBlurb && !hasLLM) return res.status(500).json({ success: false, message: 'AI is not available for blurb. Set ANTHROPIC_API_KEY or switch to ChatGPT in Admin.' });
+      if (!useClaudeForBlurb && !hasOpenAIChat) return res.status(500).json({ success: false, message: 'AI is not available for blurb. Set OPENAI_API_KEY.' });
+    } else {
+      const useOpenAIForDetails = (settings.collegeDetails || 'openai') === 'openai';
+      if (useOpenAIForDetails && !hasOpenAIChat) return res.status(500).json({ success: false, message: 'AI is not available for college details. Set OPENAI_API_KEY or switch to Claude in Admin.' });
+      if (!useOpenAIForDetails && !hasLLM) return res.status(500).json({ success: false, message: 'AI is not available for college details. Set ANTHROPIC_API_KEY.' });
+    }
+    let details;
+    if (blurbOnly) {
+      const useClaudeForBlurb = (settings.collegeBlurb || 'claude') === 'claude';
+      const context = await getModule0ContextForUser(req.session.userId);
+      const studentContext = (context && context.allAnswersFormatted && context.allAnswersFormatted.trim())
+        ? `\n\nStudent's profile:\n${context.allAnswersFormatted}`
+        : '';
+      const blurbPrompt = `Write exactly one short sentence explaining why "${name}" is a good fit for this student (e.g. "Strong match for your STEM focus and research interests" or "Fits your interest in liberal arts and campus culture").${studentContext}\n\nReply with only that one sentence, nothing else.`;
+      if (useClaudeForBlurb && hasLLM) {
+        details = await chatComplete('You are a college counselor. Reply with only one short sentence explaining why this college is a good fit for this student.', blurbPrompt, { maxTokens: 120, temperature: 0.5 });
+      } else {
+        details = await openaiChatComplete('You are a college counselor. Reply with only one short sentence explaining why this college is a good fit for this student.', blurbPrompt, { maxTokens: 120, temperature: 0.5 });
+      }
+    } else {
+      const useOpenAIForDetails = (settings.collegeDetails || 'openai') === 'openai';
+      const applicationCycle = await getApplicationCycleForUser(req.session.userId);
+      const cycleInstruction = applicationCycle
+        ? `\nApplication cycle: "${applicationCycle}". Use this cycle for rea/ea/ed/rd: ED/EA/REA typically in fall of the first year (e.g. November), RD in January of the second year. If official dates for this cycle are not yet published, predict them based on the college's typical deadline pattern. `
+        : '';
+      const structuredPrompt = `Provide detailed information about the college/university "${name}" for a prospective student.${cycleInstruction}
+
+Return ONLY a valid JSON object with exactly these keys (use approximate figures when exact data is unknown):
+- "location" (string): city and state, e.g. "Boston, Massachusetts"
+- "gpa" (string): average admitted GPA, e.g. "3.7"
+- "sat" (string): middle 50% SAT range, e.g. "1350-1520"
+- "act" (string): middle 50% ACT range, e.g. "30-34"
+- "acceptanceRate" (string): e.g. "7%" or "7"
+- "costAfterAid" (string): average net price per year after aid, e.g. "$18,000/yr"
+- "rea" (string): Restrictive Early Action deadline with year, e.g. "November 1, 2027" or "Not offered" (empty string if not applicable)
+- "ea" (string): Early Action deadline with year, e.g. "November 1, 2027" or "Not offered"
+- "ed" (string): Early Decision deadline with year, e.g. "November 15, 2027" or "Not offered"
+- "rd" (string): Regular Decision deadline with year, e.g. "January 1, 2028" or "January 15, 2028"
+- "description" (string): 1-2 paragraphs covering: what the college is known for and best at; strongest majors and programs; campus culture and strengths; notable opportunities (research, internships, study abroad); and why it might be a good fit for students. Be specific and concise. Use line breaks between paragraphs.
+
+No markdown, no other text—only the JSON object.`;
+      const raw = (useOpenAIForDetails && hasOpenAIChat)
+        ? await openaiChatComplete('You are a college counselor. Reply with ONLY a valid JSON object. No other text, no markdown.', structuredPrompt, { maxTokens: 1200, temperature: 0.4 })
+        : await chatComplete('You are a college counselor. Reply with ONLY a valid JSON object. No other text, no markdown.', structuredPrompt, { maxTokens: 1200, temperature: 0.4 });
+      const str = (raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      let location = '';
+      let gpa = '';
+      let sat = '';
+      let act = '';
+      let acceptanceRate = '';
+      let costAfterAid = '';
+      let rea = '';
+      let ea = '';
+      let ed = '';
+      let rd = '';
+      details = '';
+      try {
+        const parsed = JSON.parse(str);
+        if (parsed && typeof parsed === 'object') {
+          location = (parsed.location != null && String(parsed.location).trim()) ? String(parsed.location).trim() : '';
+          gpa = (parsed.gpa != null && String(parsed.gpa).trim()) ? String(parsed.gpa).trim() : '';
+          sat = (parsed.sat != null && String(parsed.sat).trim()) ? String(parsed.sat).trim() : '';
+          act = (parsed.act != null && String(parsed.act).trim()) ? String(parsed.act).trim() : '';
+          acceptanceRate = (parsed.acceptanceRate != null && String(parsed.acceptanceRate).trim()) ? String(parsed.acceptanceRate).trim() : '';
+          if (acceptanceRate && !/%/.test(acceptanceRate) && /^\d+(\.\d+)?$/.test(acceptanceRate)) acceptanceRate = acceptanceRate + '%';
+          costAfterAid = (parsed.costAfterAid != null && String(parsed.costAfterAid).trim()) ? String(parsed.costAfterAid).trim() : '';
+          rea = (parsed.rea != null && String(parsed.rea).trim()) ? String(parsed.rea).trim() : '';
+          ea = (parsed.ea != null && String(parsed.ea).trim()) ? String(parsed.ea).trim() : '';
+          ed = (parsed.ed != null && String(parsed.ed).trim()) ? String(parsed.ed).trim() : '';
+          rd = (parsed.rd != null && String(parsed.rd).trim()) ? String(parsed.rd).trim() : '';
+          details = (parsed.description != null && String(parsed.description).trim()) ? String(parsed.description).trim() : '';
+        }
+      } catch (_) {}
+      if (!details) {
+        const fallbackPrompt = `Provide concise details about "${name}" for a student: location, notable programs, acceptance rate if known, campus culture, and why it might be a good fit. Use 2-4 sentences.`;
+        details = (useOpenAIForDetails && hasOpenAIChat)
+          ? await openaiChatComplete('You are a college counselor. Provide brief, factual details.', fallbackPrompt, { maxTokens: 400, temperature: 0.5 })
+          : await chatComplete('You are a college counselor. Provide brief, factual details.', fallbackPrompt, { maxTokens: 400, temperature: 0.5 });
+        details = (details || '').trim();
+      }
+      // Save dates to user's college list so dashboard can show them without refetching
+      try {
+        const u = await db.getUserById(req.session.userId);
+        const collegeList = (u && u.collegeList && Array.isArray(u.collegeList)) ? [...u.collegeList] : [];
+        const idx = collegeList.findIndex(c => (c.name || '').trim().toLowerCase() === name.toLowerCase());
+        if (idx !== -1) {
+          collegeList[idx] = { ...collegeList[idx], rea: rea || '', ea: ea || '', ed: ed || '', rd: rd || '' };
+          await db.updateUser(req.session.userId, { collegeList });
+        }
+      } catch (err) { console.error('Save college list dates:', err); }
+      return res.json({
+        success: true,
+        details,
+        location: location || undefined,
+        gpa: gpa || undefined,
+        sat: sat || undefined,
+        act: act || undefined,
+        acceptanceRate: acceptanceRate || undefined,
+        costAfterAid: costAfterAid || undefined,
+        rea: rea || undefined,
+        ea: ea || undefined,
+        ed: ed || undefined,
+        rd: rd || undefined
+      });
+    }
+    res.json({ success: true, details: (details || '').trim() });
+  } catch (e) {
+    console.error('College details error:', e);
+    res.status(500).json({ success: false, message: 'Failed to load college details.' });
+  }
+});
+
+app.get('/api/college-suggest', requireLoginEarly, async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q || q.length < 2) return res.json({ success: true, suggestions: [] });
+    const useOpenAI = hasOpenAIChat;
+    if (!useOpenAI && !hasLLM) return res.json({ success: true, suggestions: [] });
+    const collegeMatchPrompt = `Resolve to full official US college/university names. If "${q}" is an abbreviation or nickname (e.g. umich, UCLA, USC, Gators), return the full official name first, e.g. ["University of Michigan"] or ["University of California Los Angeles"]. Otherwise return colleges whose full name starts with or contains "${q}". Return ONLY a JSON array of strings, full official names only. No markdown. Put the single best match first.`;
+    const raw = useOpenAI
+      ? (await openaiChatComplete('You are a college counselor. Reply with ONLY a valid JSON array of college/university full official names. No other text.', collegeMatchPrompt, { maxTokens: 512, temperature: 0.3 }) || '')
+      : (await chatComplete('You are a college counselor. Reply with ONLY a valid JSON array of college/university full official names. No other text.', collegeMatchPrompt, { maxTokens: 512, temperature: 0.3 }) || '');
+    let arr = [];
+    const jsonStr = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed)) {
+        arr = parsed
+          .map(s => typeof s === 'string' ? s.trim() : (s && typeof s.name === 'string' ? s.name.trim() : ''))
+          .filter(Boolean)
+          .slice(0, 15);
+      }
+    } catch (_) {
+      const m = raw.match(/\[[\s\S]*\]/);
+      if (m) {
+        try {
+          const fallback = JSON.parse(m[0]);
+          if (Array.isArray(fallback)) {
+            arr = fallback
+              .map(s => typeof s === 'string' ? s.trim() : (s && typeof s.name === 'string' ? s.name.trim() : ''))
+              .filter(Boolean)
+              .slice(0, 15);
+          }
+        } catch (__) {}
+      }
+    }
+    res.json({ success: true, suggestions: arr });
+  } catch (e) {
+    console.error('College suggest error:', e);
+    res.json({ success: true, suggestions: [] });
+  }
+});
+
+// POST college-match and college-strategy: Claude only (never ChatGPT) for generating recommended colleges.
+app.post('/api/college-match', requireLoginEarly, async (req, res) => {
+  try {
+    if (!hasLLM) {
+      return res.status(500).json({ success: false, message: 'AI is not available. Configure ANTHROPIC_API_KEY.' });
+    }
+    let context = await getModule0ContextForUser(req.session.userId);
+    const hasUsableContext = context && context.allAnswersFormatted && context.allAnswersFormatted.trim();
+    if (!hasUsableContext && req.body && req.body.allAnswers && Object.keys(req.body.allAnswers).length > 0) {
+      const formatted = await formatAnswersToContext(req.body.allAnswers);
+      if (formatted && formatted.trim()) context = { allAnswersFormatted: formatted, allAnswers: req.body.allAnswers };
+    }
+    if (!context || !context.allAnswersFormatted || !context.allAnswersFormatted.trim()) {
+      return res.status(400).json({ success: false, message: 'Complete Module 0 (Initial Diagnostic) first to get college matches.' });
+    }
+    const prompt = `Based on this student's questionnaire responses, recommend 6-8 colleges or universities that would be a good fit.
+
+Student's responses:
+${context.allAnswersFormatted}
+
+Return ONLY a valid JSON array of objects. Each object must have exactly:
+- "name": string (college/university name)
+- "blurb": string (one short sentence why it's a good fit for this student)
+
+Example format:
+[{"name":"MIT","blurb":"Strong match for STEM and research interests."},{"name":"Stanford University","blurb":"Fits your focus on entrepreneurship and innovation."}]
+
+No markdown, no code fence, no extra text—only the JSON array.`;
+    const raw = await chatComplete(
+      'You are a college counselor. Output only valid JSON: an array of objects with "name" and "blurb" keys.',
+      prompt,
+      { maxTokens: 2048, temperature: 0.6 }
+    ) || '';
+    let jsonStr = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (_) {
+      const match = raw.match(/\[[\s\S]*\]/);
+      parsed = match ? JSON.parse(match[0]) : [];
+    }
+    const colleges = Array.isArray(parsed)
+      ? parsed
+          .filter(c => c && typeof c.name === 'string' && c.name.trim())
+          .map(c => ({ name: String(c.name).trim(), blurb: typeof c.blurb === 'string' ? c.blurb.trim() : '' }))
+          .slice(0, 12)
+      : [];
+    res.json({ success: true, colleges });
+  } catch (e) {
+    console.error('College match error:', e);
+    res.status(500).json({ success: false, message: e.message || 'Failed to generate college matches.' });
+  }
+});
+
+// Format answers object into context string (shared helper)
+async function formatAnswersToContext(answers) {
+  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return '';
+  const systemFields = ['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions', 'postCollegeAnswers'];
+  let questions = await db.getQuestions();
+  if (!questions || questions.length === 0) questions = readJSONFile(QUESTIONS_FILE);
+  const questionsMap = {};
+  (questions || []).forEach(q => { if (q && q.id != null) questionsMap[String(q.id)] = q; });
+  const toStr = (v) => {
+    if (v == null) return '';
+    if (Array.isArray(v)) return v.map(toStr).filter(Boolean).join(', ');
+    if (typeof v === 'object') return (v.value != null ? v.value : v.text != null ? v.text : JSON.stringify(v));
+    return String(v);
+  };
+  let formatted = Object.entries(answers)
+    .filter(([key]) => !systemFields.includes(key))
+    .map(([qId, ans]) => {
+      const q = questionsMap[qId] || questionsMap[String(qId)];
+      const qText = q ? q.text : qId;
+      const formattedAns = toStr(ans).trim();
+      if (!formattedAns) return null;
+      if (q && q.chatPrompt && q.chatPrompt.includes('{answer}')) return q.chatPrompt.replace(/{answer}/g, formattedAns);
+      return `${qText}: ${formattedAns}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+  if (!formatted || !formatted.trim()) {
+    formatted = Object.entries(answers)
+      .filter(([key]) => !systemFields.includes(key))
+      .map(([qId, ans]) => {
+        const formattedAns = toStr(ans).trim();
+        if (!formattedAns) return null;
+        return `Question ${qId}: ${formattedAns}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  return formatted;
+}
+
+// College strategy (safeties/targets/reaches): Claude only, never OpenAI.
+app.post('/api/college-strategy', requireLoginEarly, async (req, res) => {
+  try {
+    if (!hasLLM) {
+      return res.status(500).json({ success: false, message: 'AI is not available. Configure ANTHROPIC_API_KEY.' });
+    }
+    let context = await getModule0ContextForUser(req.session.userId);
+    // Fallback: use client-sent allAnswers when server has no usable formatted context
+    const hasUsableContext = context && context.allAnswersFormatted && context.allAnswersFormatted.trim();
+    if (!hasUsableContext && req.body && req.body.allAnswers && Object.keys(req.body.allAnswers).length > 0) {
+      const formatted = await formatAnswersToContext(req.body.allAnswers);
+      if (formatted && formatted.trim()) context = { allAnswersFormatted: formatted, allAnswers: req.body.allAnswers };
+    }
+    if (!context || !context.allAnswersFormatted || !context.allAnswersFormatted.trim()) {
+      return res.status(400).json({ success: false, message: 'Complete Module 0 (Initial Diagnostic) first.' });
+    }
+    const user = await db.getUserById(req.session.userId);
+    const existingList = (user && user.collegeList && Array.isArray(user.collegeList)) ? user.collegeList : [];
+    const existingNames = existingList.map(c => (c && c.name) ? String(c.name).trim() : '').filter(Boolean);
+    const excludeInstruction = existingNames.length > 0
+      ? `\n\nDo not include the following colleges (the student has already added these to their list): ${existingNames.join(', ')}. Recommend only colleges that are not in that list.`
+      : '';
+
+    const coursePath = path.join(__dirname, 'data', 'course.json');
+    let course = {};
+    try {
+      course = JSON.parse(fs.readFileSync(coursePath, 'utf8'));
+    } catch (_) {}
+    const mod1 = (course.modules || []).find(m => m.id === 'module-1');
+    const pages = (mod1 && mod1.pages && Array.isArray(mod1.pages)) ? mod1.pages : [];
+    const collegeListFormatted = existingList.length > 0
+      ? existingList.map(c => c.blurb ? `${c.name}: ${c.blurb}` : c.name).join('\n')
+      : 'No colleges added yet.';
+    const statsInstruction = ' For each college you MUST include: "gpa" (average admitted GPA, e.g. "3.6"), "sat" (middle 50% SAT range, e.g. "1200-1380"), "act" (middle 50% ACT range, e.g. "26-32"), "costAfterAid" (average net price per year after aid, e.g. "$15,000/yr"), "acceptanceRate" (e.g. "65%" or "65"). Use real or well-known approximate figures.';
+    const getPrompt = (id) => {
+      const p = pages.find(pa => pa.id === id);
+      let base = (p && p.prompt && String(p.prompt).trim()) ? String(p.prompt).replace(/\{allAnswers\}/g, context.allAnswersFormatted) : null;
+      if (base) base = replaceInsightPlaceholders(base.replace(/\{collegeList\}/g, collegeListFormatted));
+      return base ? base + statsInstruction + excludeInstruction : null;
+    };
+    const defaultPrompt = (label) => `Recommend around 10 ${label} colleges for this student.
+
+Student's responses:
+${context.allAnswersFormatted}${excludeInstruction}
+
+Return ONLY a JSON array. Each object must have exactly these 7 keys (use approximate figures if needed): name, blurb, gpa, sat, act, costAfterAid, acceptanceRate. Example gpa: "3.6", sat: "1200-1380", act: "26-32", costAfterAid: "$15,000/yr", acceptanceRate: "65%". No markdown.`;
+    const toList = (raw) => {
+      const str = (raw || '').trim();
+      if (!str) return [];
+      let jsonStr = str.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      let arr = [];
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed)) arr = parsed;
+        else if (parsed && Array.isArray(parsed.colleges)) arr = parsed.colleges;
+        else if (parsed && Array.isArray(parsed.recommendations)) arr = parsed.recommendations;
+      } catch (_) {}
+      if (arr.length === 0) {
+        const m = str.match(/\[[\s\S]*\]/);
+        if (m) {
+          try { arr = JSON.parse(m[0]); } catch (__) {
+            try { arr = JSON.parse(m[0].replace(/'/g, '"')); } catch (___) {}
+          }
+        }
+      }
+      const pick = (c, ...keys) => {
+        for (const k of keys) {
+          if (c[k] != null && String(c[k]).trim()) return String(c[k]).trim();
+        }
+        // Case-insensitive: match any key that equals or contains the target (e.g. "GPA", "average_gpa")
+        const target = keys[0].toLowerCase();
+        for (const objKey of Object.keys(c)) {
+          const k = objKey.toLowerCase().replace(/[-_\s]/g, '');
+          const match = k === target || k.includes(target) || (target === 'costafteraid' && (k.includes('cost') || k.includes('net') || k.includes('aid'))) || (target === 'acceptancerate' && (k.includes('acceptance') || k === 'acceptance'));
+          if (match) {
+            const v = c[objKey];
+            if (v != null && String(v).trim()) return String(v).trim();
+          }
+        }
+        return '';
+      };
+      const normalize = (c) => {
+        if (!c || typeof c !== 'object') return null;
+        const name = (c.name != null && String(c.name).trim()) ? String(c.name).trim()
+          : (c.college != null && String(c.college).trim()) ? String(c.college).trim()
+          : (c.school != null && String(c.school).trim()) ? String(c.school).trim()
+          : null;
+        if (!name) return null;
+        const blurb = (typeof c.blurb === 'string' && c.blurb.trim()) ? c.blurb.trim()
+          : (typeof c.description === 'string' && c.description.trim()) ? c.description.trim()
+          : '';
+        const gpa = pick(c, 'gpa', 'gpaAvg', 'averageGpa', 'GPA');
+        const sat = pick(c, 'sat', 'satAvg', 'middle50Sat', 'satRange', 'SAT');
+        const act = pick(c, 'act', 'actAvg', 'middle50Act', 'actRange', 'ACT');
+        const costAfterAid = pick(c, 'costAfterAid', 'netPrice', 'netCost', 'cost', 'cost_after_aid', 'CostAfterAid');
+        let acceptanceRate = pick(c, 'acceptanceRate', 'acceptance_rate', 'acceptance', 'acceptanceRatePct', 'Acceptance Rate');
+        if (acceptanceRate && !/%/.test(acceptanceRate) && /^\d+(\.\d+)?$/.test(acceptanceRate.trim())) acceptanceRate = acceptanceRate.trim() + '%';
+        return { name, blurb, gpa, sat, act, costAfterAid, acceptanceRate };
+      };
+      const out = (Array.isArray(arr) ? arr : [])
+        .map(normalize)
+        .filter(Boolean)
+        .slice(0, 15);
+      if (out.length === 0 && str.length > 50) {
+        console.warn('College strategy: parsed 0 colleges. Raw (first 500 chars):', str.slice(0, 500));
+      }
+      return out;
+    };
+    const system = `You are a college counselor. Reply with ONLY a valid JSON array—no other text, no markdown, no explanation.
+
+CRITICAL: Every object in the array MUST have exactly these 7 keys—do not omit any:
+- "name" (string): college name
+- "blurb" (string): one short sentence why it fits
+- "gpa" (string): average admitted GPA, e.g. "3.6"
+- "sat" (string): middle 50% SAT range, e.g. "1200-1380"
+- "act" (string): middle 50% ACT range, e.g. "26-32"
+- "costAfterAid" (string): average net price per year after aid, e.g. "$15,000/yr"
+- "acceptanceRate" (string): acceptance rate, e.g. "65%" or "65"
+
+Use approximate figures when exact data is unknown. Example:
+[{"name":"Virginia Commonwealth University","blurb":"Strong public option with diverse programs.","gpa":"3.5","sat":"1050-1280","act":"21-28","costAfterAid":"$14,000/yr","acceptanceRate":"91%"}]`;
+
+    const category = (req.body && req.body.category)
+      ? String(req.body.category).toLowerCase()
+      : (req.query && req.query.category) ? String(req.query.category).toLowerCase() : null;
+
+    if (category === 'safeties' || category === 'targets' || category === 'reaches') {
+      const id = category;
+      let colleges = [];
+      try {
+        const raw = await chatComplete(
+          system,
+          getPrompt(id) || defaultPrompt(id === 'safeties' ? 'safety' : id === 'targets' ? 'target' : 'reach'),
+          { maxTokens: 2048, temperature: 0.4 }
+        );
+        colleges = toList(raw);
+      } catch (e) {
+        console.error('College strategy chatComplete error:', e);
+        return res.status(500).json({ success: false, message: e.message || 'AI failed to generate recommendations. Configure ANTHROPIC_API_KEY in .env.' });
+      }
+      // Static acceptance rates (approx) for well-known US colleges — used when AI doesn't return a rate
+      const ACCEPTANCE_LOOKUP = {
+        'university of virginia': '19%', 'uva': '19%', 'virginia': '19%',
+        'virginia tech': '57%', 'virginia polytechnic': '57%',
+        'virginia commonwealth university': '91%', 'vcu': '91%',
+        'james madison university': '80%', 'jmu': '80%',
+        'george mason university': '89%', 'gmu': '89%',
+        'william & mary': '33%', 'william and mary': '33%',
+        'university of michigan': '18%', 'umich': '18%', 'michigan': '18%',
+        'michigan state university': '83%', 'msu': '83%',
+        'ohio state university': '53%', 'ohio state': '53%', 'osu': '53%',
+        'penn state': '55%', 'pennsylvania state university': '55%',
+        'university of florida': '23%', 'uf': '23%', 'florida': '23%',
+        'florida state university': '25%', 'fsu': '25%',
+        'university of california los angeles': '9%', 'ucla': '9%',
+        'university of california berkeley': '11%', 'uc berkeley': '11%', 'ucb': '11%',
+        'university of southern california': '12%', 'usc': '12%',
+        'stanford university': '4%', 'stanford': '4%',
+        'mit': '4%', 'massachusetts institute of technology': '4%',
+        'harvard': '3%', 'harvard university': '3%',
+        'duke university': '6%', 'duke': '6%',
+        'unc': '17%', 'university of north carolina': '17%', 'north carolina': '17%',
+        'georgia tech': '17%', 'georgia institute of technology': '17%', 'gtech': '17%',
+        'university of georgia': '40%', 'uga': '40%', 'georgia': '40%',
+        'university of texas at austin': '31%', 'ut austin': '31%', 'utexas': '31%',
+        'texas a&m': '64%', 'texas a and m': '64%',
+        'new york university': '12%', 'nyu': '12%',
+        'boston university': '19%', 'bu': '19%',
+        'northeastern university': '7%', 'northeastern': '7%',
+        'syracuse university': '52%', 'syracuse': '52%',
+        'purdue university': '53%', 'purdue': '53%',
+        'indiana university': '85%', 'iu': '85%',
+        'university of illinois': '45%', 'uiuc': '45%', 'illinois': '45%',
+        'university of wisconsin': '49%', 'wisconsin': '49%',
+        'university of minnesota': '75%', 'minnesota': '75%',
+        'university of washington': '48%', 'uw': '48%', 'udub': '48%',
+        'university of colorado boulder': '79%', 'cu boulder': '79%',
+        'arizona state university': '88%', 'asu': '88%',
+        'university of arizona': '87%', 'arizona': '87%',
+        'brigham young university': '67%', 'byu': '67%',
+        'university of central florida': '41%', 'ucf': '41%',
+        'university of south florida': '44%', 'usf': '44%',
+        'clemson university': '43%', 'clemson': '43%',
+        'university of miami': '19%', 'miami': '19%',
+        'tulane university': '11%', 'tulane': '11%',
+        'vanderbilt university': '7%', 'vanderbilt': '7%',
+        'emory university': '11%', 'emory': '11%',
+        'university of richmond': '24%', 'richmond': '24%',
+        'georgetown university': '12%', 'georgetown': '12%',
+        'american university': '41%', 'american': '41%',
+        'howard university': '35%', 'howard': '35%',
+        'north carolina state university': '47%', 'nc state': '47%', 'ncsu': '47%',
+        'wake forest university': '21%', 'wake forest': '21%',
+        'boston college': '19%', 'bc': '19%',
+        'villanova university': '23%', 'villanova': '23%',
+        'fordham university': '54%', 'fordham': '54%',
+        'rutgers university': '66%', 'rutgers': '66%',
+        'university of maryland': '44%', 'umd': '44%', 'maryland': '44%',
+        'university of pittsburgh': '49%', 'pitt': '49%', 'pittsburgh': '49%',
+        'temple university': '60%', 'temple': '60%',
+        'drexel university': '80%', 'drexel': '80%',
+        'case western reserve': '27%', 'case western': '27%',
+        'miami university': '89%', 'miami university ohio': '89%',
+        'depaul university': '70%', 'depaul': '70%',
+        'loyola university chicago': '77%', 'loyola chicago': '77%',
+        'university of iowa': '86%', 'iowa': '86%',
+        'iowa state university': '90%', 'iowa state': '90%',
+        'university of oregon': '83%', 'oregon': '83%',
+        'oregon state university': '82%', 'oregon state': '82%',
+        'university of utah': '95%', 'utah': '95%',
+        'san diego state university': '38%', 'sdsu': '38%',
+        'california state university': '64%', 'cal state': '64%',
+        'texas tech university': '70%', 'texas tech': '70%',
+        'baylor university': '46%', 'baylor': '46%',
+        'southern methodist university': '52%', 'smu': '52%',
+        'tcu': '56%', 'texas christian university': '56%',
+        'university of oklahoma': '73%', 'oklahoma': '73%',
+        'university of kansas': '88%', 'kansas': '88%',
+        'university of kentucky': '95%', 'kentucky': '95%',
+        'university of tennessee': '68%', 'tennessee': '68%',
+        'university of alabama': '80%', 'alabama': '80%',
+        'auburn university': '71%', 'auburn': '71%',
+        'university of south carolina': '62%', 'south carolina': '62%',
+        'louisiana state university': '73%', 'lsu': '73%',
+        'university of arkansas': '79%', 'arkansas': '79%',
+        'university of mississippi': '97%', 'ole miss': '97%',
+        'university of nebraska': '81%', 'nebraska': '81%',
+        'university of connecticut': '55%', 'uconn': '55%', 'connecticut': '55%',
+        'university of massachusetts': '66%', 'umass': '66%', 'massachusetts': '66%',
+        'stony brook university': '49%', 'stony brook': '49%',
+        'binghamton university': '42%', 'binghamton': '42%',
+        'university at buffalo': '68%', 'buffalo': '68%',
+        'university of rochester': '39%', 'rochester': '39%',
+        'cornell university': '7%', 'cornell': '7%',
+        'columbia university': '4%', 'columbia': '4%',
+        'princeton university': '4%', 'princeton': '4%',
+        'yale university': '5%', 'yale': '5%',
+        'brown university': '5%', 'brown': '5%',
+        'dartmouth college': '6%', 'dartmouth': '6%',
+        'university of pennsylvania': '6%', 'upenn': '6%', 'penn': '6%',
+        'northwestern university': '7%', 'northwestern': '7%',
+        'university of chicago': '5%', 'uchicago': '5%',
+        'university of notre dame': '13%', 'notre dame': '13%',
+        'washington university in st louis': '11%', 'washu': '11%', 'wustl': '11%',
+        'rice university': '8%', 'rice': '8%',
+        'university of california davis': '37%', 'uc davis': '37%', 'ucd': '37%',
+        'university of california irvine': '21%', 'uc irvine': '21%', 'uci': '21%',
+        'university of california san diego': '24%', 'uc san diego': '24%', 'ucsd': '24%',
+        'university of california santa barbara': '29%', 'uc santa barbara': '29%', 'ucsb': '29%'
+      };
+      const normName = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[&]/g, ' and ');
+      function lookupAcceptance(name) {
+        const n = normName(name);
+        if (!n) return '';
+        if (ACCEPTANCE_LOOKUP[n]) return ACCEPTANCE_LOOKUP[n];
+        for (const key of Object.keys(ACCEPTANCE_LOOKUP)) {
+          if (n.includes(key) || key.includes(n)) return ACCEPTANCE_LOOKUP[key];
+        }
+        return '';
+      }
+
+      if (colleges.length > 0 && (hasOpenAIChat || hasLLM)) {
+        try {
+          const namesList = colleges.map(c => c.name).filter(Boolean);
+          const acceptancePrompt = `These US colleges are listed in order. For each one, give ONLY its approximate acceptance rate as a number 0-100 (same order).
+
+Return ONLY a JSON array of numbers. One number per college, in the exact same order. No other text, no markdown. Example: [91, 65, 22]
+
+Colleges:
+${namesList.map((n, i) => `${i + 1}. ${n}`).join('\n')}`;
+          const acceptanceRaw = hasOpenAIChat
+            ? await openaiChatComplete(
+                'You are a factual assistant. Reply with ONLY a JSON array of numbers. No other text.',
+                acceptancePrompt,
+                { maxTokens: 512, temperature: 0.1 }
+              )
+            : await chatComplete(
+                'You are a factual assistant. Reply with ONLY a JSON array of numbers. No other text.',
+                acceptancePrompt,
+                { maxTokens: 512, temperature: 0.1 }
+              );
+          const accStr = (acceptanceRaw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+          let rateNumbers = [];
+
+          // 1) Try parse as array of numbers
+          try {
+            const parsed = JSON.parse(accStr);
+            if (Array.isArray(parsed)) {
+              rateNumbers = parsed.map(v => {
+                if (typeof v === 'number' && v >= 0 && v <= 100) return String(Math.round(v)) + '%';
+                if (typeof v === 'string') {
+                  const m = String(v).trim().match(/^(\d+(?:\.\d+)?)\s*%?$/);
+                  return m ? (m[1].includes('.') ? m[1] + '%' : m[1] + '%') : null;
+                }
+                return null;
+              }).filter(Boolean);
+            }
+          } catch (_) {}
+          // 2) Try extract array from raw string
+          if (rateNumbers.length === 0) {
+            const arrMatch = accStr.match(/\[[\s\d.,%]+\]/);
+            if (arrMatch) {
+              try {
+                const arr = JSON.parse(arrMatch[0].replace(/%/g, ''));
+                if (Array.isArray(arr)) rateNumbers = arr.map(v => (typeof v === 'number' && v >= 0 && v <= 100) ? String(Math.round(v)) + '%' : null).filter(Boolean);
+              } catch (__) {}
+            }
+          }
+          // 3) Extract percentages from text in order (e.g. "91%", "65", "22 percent")
+          if (rateNumbers.length === 0) {
+            const tokens = accStr.replace(/\n/g, ' ').split(/[\s,;]+/);
+            for (const t of tokens) {
+              const m = t.match(/^(\d+(?:\.\d+)?)\s*%?$/);
+              if (m) {
+                const num = parseFloat(m[1]);
+                if (num >= 0 && num <= 100) rateNumbers.push(String(Math.round(num)) + '%');
+              }
+            }
+          }
+          for (let i = 0; i < rateNumbers.length && i < colleges.length; i++) {
+            if (!colleges[i].acceptanceRate) colleges[i].acceptanceRate = rateNumbers[i];
+          }
+          // 4) If AI returned array of objects with name/rate, merge by name
+          let accList = [];
+          try {
+            const parsed = JSON.parse(accStr);
+            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0] && typeof parsed[0] === 'object') accList = parsed;
+          } catch (_) {
+            const m = accStr.match(/\[[\s\S]*\]/);
+            if (m) try { const p = JSON.parse(m[0]); if (Array.isArray(p) && p[0] && typeof p[0] === 'object') accList = p; } catch (__) {}
+          }
+          function getRate(obj) {
+            if (obj == null) return '';
+            if (typeof obj === 'string') {
+              const s = obj.trim();
+              const m = s.match(/^(\d+(?:\.\d+)?)\s*%?$/);
+              return m ? (s.includes('%') ? s : m[1] + '%') : '';
+            }
+            if (typeof obj !== 'object') return '';
+            const v = obj.acceptanceRate ?? obj.acceptance_rate ?? obj['Acceptance Rate'];
+            if (v != null && String(v).trim()) return String(v).trim();
+            for (const k of Object.keys(obj)) {
+              if (/acceptance/i.test(k) && (/rate/i.test(k) || k.toLowerCase() === 'acceptance') && obj[k] != null && String(obj[k]).trim()) return String(obj[k]).trim();
+            }
+            return '';
+          }
+          const norm = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          accList.forEach((acc) => {
+            const name = (acc && acc.name != null) ? String(acc.name).trim() : '';
+            let rate = getRate(acc);
+            if (!rate) return;
+            if (!/%/.test(rate) && /^\d+(\.\d+)?$/.test(rate)) rate = rate + '%';
+            const college = colleges.find(c => !c.acceptanceRate && name && (norm(c.name) === norm(name) || norm(c.name).includes(norm(name)) || norm(name).includes(norm(c.name))));
+            if (college) college.acceptanceRate = rate;
+          });
+        } catch (e) {
+          console.warn('College strategy: acceptance rates failed:', e.message);
+        }
+      }
+
+      // Fill any still missing with static lookup, then ensure key exists
+      colleges.forEach(c => {
+        if (c && (!c.acceptanceRate || c.acceptanceRate === '')) {
+          const looked = lookupAcceptance(c.name);
+          if (looked) c.acceptanceRate = looked;
+        }
+        if (c && (c.acceptanceRate === undefined || c.acceptanceRate === null)) c.acceptanceRate = '';
+      });
+      return res.json({ success: true, colleges });
+    }
+
+    if (!category) {
+      console.warn('College strategy: no category in body or query. Body:', typeof req.body, req.body ? Object.keys(req.body) : 'none');
+    }
+
+    const [safetiesRaw, targetsRaw, reachesRaw] = await Promise.all([
+      chatComplete(system, getPrompt('safeties') || defaultPrompt('safety'), { maxTokens: 1024, temperature: 0.6 }),
+      chatComplete(system, getPrompt('targets') || defaultPrompt('target'), { maxTokens: 1024, temperature: 0.6 }),
+      chatComplete(system, getPrompt('reaches') || defaultPrompt('reach'), { maxTokens: 1024, temperature: 0.6 })
+    ]);
+    const safeties = toList(safetiesRaw);
+    const targets = toList(targetsRaw);
+    const reaches = toList(reachesRaw);
+
+    res.json({
+      success: true,
+      safeties,
+      targets,
+      reaches
+    });
+  } catch (e) {
+    console.error('College strategy error:', e);
+    res.status(500).json({ success: false, message: e.message || 'Failed to generate strategy.' });
+  }
+});
+
+// Parse resume or transcript and extract Module 0 answers (ChatGPT) — register before static
+app.post('/api/module-0/parse-document', optionalLogin, uploadResume.single('document'), async (req, res) => {
+  let filePath = null;
+  try {
+    if (!req.file || !req.file.path) {
+      return res.status(400).json({ success: false, message: 'No file uploaded. Upload a PDF, DOCX, or TXT resume or transcript.' });
+    }
+    filePath = req.file.path;
+    if (!hasOpenAIChat) {
+      return res.status(503).json({ success: false, message: 'Document parsing requires OpenAI. Set OPENAI_API_KEY in .env.' });
+    }
+
+    const mimetype = (req.file.mimetype || '').toLowerCase();
+    const name = (req.file.originalname || '').toLowerCase();
+    const isPdf = mimetype === 'application/pdf' || name.endsWith('.pdf');
+    const isDocx = mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx');
+    let documentText = '';
+    if (isPdf) {
+      const buffer = fs.readFileSync(filePath);
+      const data = await pdfParse(buffer);
+      documentText = (data && data.text) ? data.text : '';
+    } else if (isDocx) {
+      const buffer = fs.readFileSync(filePath);
+      const result = await mammoth.extractRawText({ buffer });
+      documentText = (result && result.value) ? result.value : '';
+    } else {
+      documentText = fs.readFileSync(filePath, 'utf8');
+    }
+    if (!documentText || documentText.trim().length < 50) {
+      return res.status(400).json({ success: false, message: 'Document is empty or too short. Upload a resume or transcript with readable text.' });
+    }
+
+    const coursePath = path.join(__dirname, 'data', 'course.json');
+    let course = { modules: [] };
+    try {
+      course = JSON.parse(fs.readFileSync(coursePath, 'utf8'));
+    } catch (_) {}
+    const mod0 = (course.modules || []).find(m => m.id === 'module-0');
+    const qIds = (mod0 && mod0.questionIds && Array.isArray(mod0.questionIds)) ? mod0.questionIds : [];
+    if (qIds.length === 0) {
+      return res.status(500).json({ success: false, message: 'Module 0 has no questions configured.' });
+    }
+
+    const questionsFilePath = path.join(__dirname, 'data', 'questions.json');
+    let allQuestions = [];
+    try {
+      allQuestions = await db.getQuestions();
+    } catch (_) {
+      try { allQuestions = readJSONFile(questionsFilePath); } catch (__) {}
+    }
+    if (!Array.isArray(allQuestions)) allQuestions = [];
+    const qMap = {};
+    allQuestions.forEach(q => { if (q && q.id) qMap[String(q.id)] = q; });
+    const module0Questions = qIds.map(id => qMap[String(id)]).filter(Boolean);
+
+    const questionsForPrompt = module0Questions.map(q => ({
+      id: q.id,
+      text: q.text,
+      type: q.type || 'text',
+      options: q.options || []
+    }));
+
+    const systemPrompt = `You are a precise assistant. Extract information from a resume or academic transcript to pre-fill a college counseling questionnaire. Return ONLY valid JSON—no markdown, no explanation.`;
+    const userPrompt = `Below is a document (resume or transcript). Then a list of questionnaire questions with ids and types.
+
+Document:
+---
+${documentText.slice(0, 28000)}
+---
+
+Questions (extract only what is clearly stated or strongly implied; omit if unsure):
+${JSON.stringify(questionsForPrompt)}
+
+Return a single JSON object mapping each question id to the extracted value. Rules:
+- For type "text", "textarea", "number", "email": use a string (e.g. "John Doe", "3.8", "123").
+- For type "radio": use exactly one string from that question's options array.
+- For type "checkbox": use a JSON array of strings, each from that question's options (e.g. ["11th", "SAT"]).
+- Use the exact option strings from the question (e.g. "7th", "8th", "9th", "10th", "11th", "12th" for grade).
+- Omit any question id where you cannot find a clear answer. Return only the object, no other text.`;
+
+    const raw = await openaiChatComplete(systemPrompt, userPrompt, { maxTokens: 4096, temperature: 0.2 });
+    const rawStr = (raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    let answers = {};
+    try {
+      const parsed = JSON.parse(rawStr);
+      if (parsed && typeof parsed === 'object') answers = parsed;
+    } catch (_) {
+      const m = rawStr.match(/\{[\s\S]*\}/);
+      if (m) try { answers = JSON.parse(m[0]); } catch (__) {}
+    }
+
+    const normalized = {};
+    for (const [qId, value] of Object.entries(answers)) {
+      const q = qMap[String(qId)];
+      if (!q) continue;
+      if (q.type === 'checkbox') {
+        const arr = Array.isArray(value) ? value : (value == null ? [] : [String(value)]);
+        normalized[qId] = arr.map(v => String(v).trim()).filter(Boolean);
+      } else if (q.type === 'radio') {
+        const s = value != null ? String(value).trim() : '';
+        normalized[qId] = s;
+      } else {
+        normalized[qId] = value != null ? String(value).trim() : '';
+      }
+    }
+
+    res.json({ success: true, answers: normalized });
+  } catch (e) {
+    console.error('Module 0 parse-document error:', e);
+    res.status(500).json({ success: false, message: e.message || 'Failed to parse document.' });
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (_) {}
+    }
+  }
 });
 
 app.use(express.static('public'));
@@ -106,6 +1109,81 @@ const RESPONSES_FILE = path.join(DATA_DIR, 'responses.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const PROMPTS_FILE = path.join(DATA_DIR, 'counselor-prompts.json');
 const POST_COLLEGE_MESSAGES_FILE = path.join(DATA_DIR, 'post-college-messages.json');
+const COURSE_FILE = path.join(DATA_DIR, 'course.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+
+const DEFAULT_SETTINGS = {
+  collegeNameMatch: 'openai',
+  collegeBlurb: 'claude',
+  collegeDetails: 'openai',
+  studentInsights: '',  // legacy single RAG result via {studentInsights}
+  ragInsights: {},      // named variables: { "admittedPatterns": "...", ... } used as {insight:name}
+  promoCodes: []        // [{ code, type: 'promo'|'feature', discountPercent?, discountAmount?, grantPlan? }]
+};
+
+let appSettingsCache = null;
+function getAppSettings() {
+  if (appSettingsCache) return appSettingsCache;
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      appSettingsCache = { ...DEFAULT_SETTINGS, ...parsed };
+      return appSettingsCache;
+    }
+  } catch (e) { console.error('Error reading settings:', e.message); }
+  appSettingsCache = { ...DEFAULT_SETTINGS };
+  return appSettingsCache;
+}
+function setAppSettings(settings) {
+  appSettingsCache = { ...DEFAULT_SETTINGS, ...settings };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(appSettingsCache, null, 2));
+}
+
+// Validate promo or feature code; returns { valid, type, discountPercent, discountAmount, grantPlan, planName } or { valid: false }
+function validatePromoCode(inputCode) {
+  const code = (typeof inputCode === 'string' && inputCode.trim()) ? inputCode.trim().toUpperCase() : '';
+  if (!code) return { valid: false };
+  const list = (getAppSettings().promoCodes || []).filter(c => c && typeof c.code === 'string');
+  const planNames = { premium: 'Premium Plan', 'plus-one-meeting': 'Premium + 1 Meeting', 'weekly-meeting': 'Premium + Weekly Meetings', 'one-time-meeting': 'One-time: 1 Meeting' };
+  for (const c of list) {
+    if (c.code.trim().toUpperCase() === code) {
+      if (c.type === 'feature' && c.grantPlan) {
+        return { valid: true, type: 'feature', grantPlan: c.grantPlan, planName: planNames[c.grantPlan] || c.grantPlan };
+      }
+      if (c.type === 'promo') {
+        const discountPercent = typeof c.discountPercent === 'number' ? c.discountPercent : 0;
+        const discountAmount = typeof c.discountAmount === 'number' ? c.discountAmount : 0;
+        return { valid: true, type: 'promo', discountPercent, discountAmount };
+      }
+      return { valid: true, type: c.type || 'promo', discountPercent: 0, discountAmount: 0 };
+    }
+  }
+  return { valid: false };
+}
+
+// Apply promo discount to amount in cents; returns cents after discount
+function applyPromoToAmount(amountCents, codeResult) {
+  if (!codeResult || !codeResult.valid || codeResult.type !== 'promo') return amountCents;
+  let final = amountCents;
+  if (codeResult.discountPercent > 0) {
+    final = Math.round(amountCents * (1 - codeResult.discountPercent / 100));
+  }
+  if (codeResult.discountAmount > 0) {
+    final = Math.max(0, final - codeResult.discountAmount);
+  }
+  return final;
+}
+
+// Replace {studentInsights} and {insight:variableName} in prompt text
+function replaceInsightPlaceholders(str) {
+  if (str == null || typeof str !== 'string') return str;
+  const settings = getAppSettings();
+  let s = str.replace(/\{studentInsights\}/g, settings.studentInsights || '');
+  const ragInsights = settings.ragInsights || {};
+  s = s.replace(/\{insight:([^}]+)\}/g, (_, name) => ragInsights[name.trim()] ?? '');
+  return s;
+}
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -221,6 +1299,11 @@ function requireLogin(req, res, next) {
       message: 'Please log in to access this resource' 
     });
   }
+}
+
+// Optional login - proceeds whether or not user is logged in
+function optionalLogin(req, res, next) {
+  next();
 }
 
 // Check if user is logged in (for frontend)
@@ -462,8 +1545,31 @@ app.get('/api/auth/check', (req, res) => {
   }
 });
 
-// Get all questions (requires login)
-app.get('/api/questions', requireLogin, async (req, res) => {
+// Canonical order for Initial Diagnostic (Module 0) questions - same as reorder-questions-mongodb.js
+const QUESTIONS_CANONICAL_ORDER = [
+  '1', '2', '3', '1765772170950', '4', '1765772367077', '1765772344326', '1765772762906',
+  '16', // Which application cycle are you in?
+  '1765772397699', '1765772638610', '1765772688681', '1765772450417', '1765772501152', '1765772542631', '1765772550210',
+  '1765772412151', '1765772737014', '1765772440701', '1765772561776', '1765772590257', '1765772750883',
+  '1765772211033', '1765772243220', '1765772607883',
+  '1765772624492', '1765772701161'
+];
+
+function sortQuestionsByCanonicalOrder(questions) {
+  if (!Array.isArray(questions) || questions.length === 0) return questions;
+  const orderMap = new Map(QUESTIONS_CANONICAL_ORDER.map((id, i) => [id, i]));
+  return [...questions].sort((a, b) => {
+    const aId = String(a.id || (a._id && a._id.toString()) || '');
+    const bId = String(b.id || (b._id && b._id.toString()) || '');
+    const aIdx = orderMap.has(aId) ? orderMap.get(aId) : QUESTIONS_CANONICAL_ORDER.length;
+    const bIdx = orderMap.has(bId) ? orderMap.get(bId) : QUESTIONS_CANONICAL_ORDER.length;
+    if (aIdx !== bIdx) return aIdx - bIdx;
+    return aId.localeCompare(bId);
+  });
+}
+
+// Get all questions (optionalLogin - for Module 0 anonymous access)
+app.get('/api/questions', optionalLogin, async (req, res) => {
   const startTime = Date.now();
   try {
     console.log(`GET /api/questions - Request received from user: ${req.session.userId || 'unknown'}`);
@@ -503,7 +1609,7 @@ app.get('/api/questions', requireLogin, async (req, res) => {
     } else {
       console.log(`GET /api/questions - Using MongoDB (${questions.length} questions)`);
     }
-    
+    questions = sortQuestionsByCanonicalOrder(questions);
     console.log(`GET /api/questions - Returning ${questions.length} questions (total time: ${Date.now() - startTime}ms)`);
     res.json(questions);
   } catch (error) {
@@ -536,6 +1642,60 @@ app.post('/api/questions', requireLogin, async (req, res) => {
   } catch (error) {
     console.error('Error saving questions:', error);
     res.status(500).json({ success: false, message: 'Failed to save questions: ' + error.message });
+  }
+});
+
+// Settings API - college AI provider etc. (admin)
+app.get('/api/settings', (req, res) => {
+  try {
+    res.json(getAppSettings());
+  } catch (e) {
+    console.error('GET /api/settings error:', e);
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+app.post('/api/settings', requireLogin, (req, res) => {
+  try {
+    const body = req.body || {};
+    const allowed = ['collegeNameMatch', 'collegeBlurb', 'collegeDetails'];
+    const updates = {};
+    allowed.forEach(k => {
+      if (body[k] === 'openai' || body[k] === 'claude') updates[k] = body[k];
+    });
+    if (body.studentInsights !== undefined && typeof body.studentInsights === 'string') {
+      updates.studentInsights = body.studentInsights;
+    }
+    if (body.ragInsights !== undefined && typeof body.ragInsights === 'object' && body.ragInsights !== null && !Array.isArray(body.ragInsights)) {
+      updates.ragInsights = body.ragInsights;
+    }
+    if (body.promoCodes !== undefined && Array.isArray(body.promoCodes)) {
+      updates.promoCodes = body.promoCodes;
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid settings to save.' });
+    }
+    const current = getAppSettings();
+    setAppSettings({ ...current, ...updates });
+    console.log('Settings updated:', updates);
+    res.json({ success: true, settings: getAppSettings() });
+  } catch (e) {
+    console.error('POST /api/settings error:', e);
+    res.status(500).json({ success: false, message: e.message || 'Failed to save settings' });
+  }
+});
+
+// Course/Modules API - POST for admin (GET is registered early before static)
+app.post('/api/course', requireLogin, (req, res) => {
+  try {
+    const course = req.body;
+    if (!course || typeof course !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid course data' });
+    }
+    writeJSONFile(COURSE_FILE, course);
+    res.json({ success: true, message: 'Course updated successfully' });
+  } catch (error) {
+    console.error('Error saving course:', error);
+    res.status(500).json({ success: false, message: 'Failed to save course' });
   }
 });
 
@@ -769,40 +1929,17 @@ app.get('/api/my-responses', requireLogin, async (req, res) => {
     console.log('GET /api/my-responses - User:', req.session.userId, req.session.username);
     
     // Try MongoDB first, fallback to JSON files
-    let userResponse = await db.getResponseByUserId(req.session.userId);
-    let allResponses = null;
+    let userResponses = await db.getResponsesByUserId(req.session.userId);
     
-    if (userResponse === null) {
+    if (userResponses === null) {
       // Fallback to JSON files
-      allResponses = readJSONFile(RESPONSES_FILE);
-      console.log('Total responses in file:', allResponses.length);
-      
-      // Filter to only show responses from the logged-in user
-      const userResponses = allResponses.filter(r => {
-        // Skip responses without userId (old responses before account system)
-        if (!r.userId) {
-          console.log('Response has no userId, skipping:', r.id);
-          return false;
-        }
-        const matches = r.userId === req.session.userId;
-        if (!matches) {
-          console.log('Response filtered out - userId mismatch:', r.userId, 'vs', req.session.userId);
-        }
-        return matches;
-      });
-      
-      console.log(`GET /api/my-responses - Returning ${userResponses.length} responses for user: ${req.session.username} (from JSON file)`);
-      res.json(userResponses);
+      const allResponses = readJSONFile(RESPONSES_FILE);
+      userResponses = allResponses.filter(r => r.userId === req.session.userId);
+      console.log(`GET /api/my-responses - Returning ${userResponses.length} responses (from JSON file)`);
     } else {
-      // Using MongoDB - return the user's response
-      if (userResponse) {
-        console.log(`GET /api/my-responses - Returning response for user: ${req.session.username} (from MongoDB)`);
-        res.json([userResponse]); // Return as array for consistency
-      } else {
-        console.log(`GET /api/my-responses - No response found for user: ${req.session.username}`);
-        res.json([]);
-      }
+      console.log(`GET /api/my-responses - Returning ${userResponses.length} responses (from MongoDB)`);
     }
+    res.json(userResponses || []);
   } catch (error) {
     console.error('Error getting user responses:', error);
     res.status(500).json({ 
@@ -980,9 +2117,12 @@ app.get('/api/export', requireAuth, (req, res) => {
   }
 });
 
-// Check payment status (requires login)
-app.get('/api/payment/status', requireLogin, async (req, res) => {
+// Check payment status (optionalLogin - returns hasPayment: false when not logged in)
+app.get('/api/payment/status', optionalLogin, async (req, res) => {
   try {
+    if (!req.session || !req.session.userId) {
+      return res.json({ success: true, hasPayment: false, paymentPlan: null, paymentDate: null });
+    }
     // Try MongoDB first, fallback to JSON files
     let user = await db.getUserById(req.session.userId);
     
@@ -1016,7 +2156,7 @@ app.get('/api/payment/status', requireLogin, async (req, res) => {
   }
 });
 
-// Record payment completion (requires login)
+// Record payment completion (requires login). Accepts optional code: feature code grants plan without charge.
 app.post('/api/payment/complete', requireLogin, async (req, res) => {
   try {
     console.log('Payment complete request:', {
@@ -1025,9 +2165,18 @@ app.post('/api/payment/complete', requireLogin, async (req, res) => {
       body: req.body
     });
     
-    const { plan, price } = req.body;
+    const { plan, price, code } = req.body;
+    let planToRecord = plan;
+
+    // Feature code can grant a plan without payment
+    if (typeof code === 'string' && code.trim()) {
+      const codeResult = validatePromoCode(code);
+      if (codeResult.valid && codeResult.type === 'feature' && codeResult.grantPlan) {
+        planToRecord = codeResult.grantPlan;
+      }
+    }
     
-    if (!plan) {
+    if (!planToRecord) {
       return res.status(400).json({ 
         success: false, 
         message: 'Payment plan is required' 
@@ -1066,7 +2215,7 @@ app.post('/api/payment/complete', requireLogin, async (req, res) => {
     const paymentDate = new Date().toISOString();
     const updateData = {
       hasPayment: true,
-      paymentPlan: plan,
+      paymentPlan: planToRecord,
       paymentDate: paymentDate
     };
     
@@ -1074,7 +2223,7 @@ app.post('/api/payment/complete', requireLogin, async (req, res) => {
       // Update in MongoDB
       const result = await db.updateUser(req.session.userId, updateData);
       if (result) {
-        console.log(`Payment recorded for user: ${user.username}, plan: ${plan} (MongoDB)`);
+        console.log(`Payment recorded for user: ${user.username}, plan: ${planToRecord} (MongoDB)`);
       } else {
         console.error('Failed to update payment in MongoDB');
         return res.status(500).json({ 
@@ -1087,16 +2236,16 @@ app.post('/api/payment/complete', requireLogin, async (req, res) => {
       const users = readJSONFile(USERS_FILE);
       const userIndex = users.findIndex(u => u.id === req.session.userId);
       users[userIndex].hasPayment = true;
-      users[userIndex].paymentPlan = plan;
+      users[userIndex].paymentPlan = planToRecord;
       users[userIndex].paymentDate = paymentDate;
       writeJSONFile(USERS_FILE, users);
-      console.log(`Payment recorded for user: ${user.username}, plan: ${plan} (JSON file)`);
+      console.log(`Payment recorded for user: ${user.username}, plan: ${planToRecord} (JSON file)`);
     }
     
     res.json({
       success: true,
       message: 'Payment recorded successfully',
-      paymentPlan: plan,
+      paymentPlan: planToRecord,
       paymentDate: paymentDate
     });
   } catch (error) {
@@ -1117,15 +2266,49 @@ function getAppUrl(req) {
   return `${proto}://${host}`;
 }
 
+// Validate promo or feature code (no login required for checkout flow)
+app.post('/api/payment/validate-code', (req, res) => {
+  try {
+    const { code } = req.body || {};
+    const result = validatePromoCode(code);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ valid: false, message: e.message || 'Invalid request' });
+  }
+});
+
 // Create Stripe Checkout Session (redirect user to Stripe to pay)
 app.post('/api/payment/create-checkout-session', requireLogin, async (req, res) => {
-  if (!stripe) {
-    return res.status(503).json({ success: false, message: 'Stripe is not configured. Set STRIPE_SECRET_KEY.' });
-  }
   try {
-    const { plan, price } = req.body;
+    const { plan, price, code } = req.body;
     const planName = plan || 'premium';
-    const amountCents = Math.round((Number(price) || 100) * 100);
+    let amountCents = Math.round((Number(price) || 100) * 100);
+    const codeResult = validatePromoCode(code);
+
+    // Feature code that grants this plan (or any plan): grant without payment
+    if (codeResult.valid && codeResult.type === 'feature' && codeResult.grantPlan) {
+      const grantPlan = codeResult.grantPlan;
+      const ok = await recordPaymentForUser(req.session.userId, grantPlan);
+      if (ok) {
+        return res.json({ success: true, granted: true, plan: grantPlan, url: null });
+      }
+    }
+
+    // Promo code: apply discount
+    if (codeResult.valid && codeResult.type === 'promo') {
+      amountCents = applyPromoToAmount(amountCents, codeResult);
+    }
+
+    if (amountCents <= 0) {
+      const planToRecord = codeResult.grantPlan || planName;
+      const ok = await recordPaymentForUser(req.session.userId, planToRecord);
+      if (ok) return res.json({ success: true, granted: true, plan: planToRecord, url: null });
+    }
+
+    if (!stripe) {
+      return res.status(503).json({ success: false, message: 'Stripe is not configured. Set STRIPE_SECRET_KEY.' });
+    }
+
     const baseUrl = getAppUrl(req);
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -1214,11 +2397,6 @@ app.get('/login.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Serve questionnaire page (client-side will check auth and payment)
-app.get('/questionnaire.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'questionnaire.html'));
-});
-
 // Serve admin page (requires login)
 app.get('/admin.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -1260,12 +2438,12 @@ function findMatchingResponse(message, prompts) {
 // Helper function to get user's questionnaire responses for context
 async function getUserResponsesForContext(userId) {
   try {
+    const doc = await db.getResponseByUserId(userId);
+    if (doc && doc.answers) return doc;
     const responses = readJSONFile(RESPONSES_FILE);
-    const userResponses = responses.filter(r => r.userId === userId);
-    // Return the most recent response
-    if (userResponses.length > 0) {
-      return userResponses[userResponses.length - 1];
-    }
+    const list = Array.isArray(responses) ? responses : [];
+    const userResponses = list.filter(r => r && r.userId === userId);
+    if (userResponses.length > 0) return userResponses[userResponses.length - 1];
     return null;
   } catch (error) {
     console.error('Error getting user responses for context:', error);
@@ -1273,19 +2451,87 @@ async function getUserResponsesForContext(userId) {
   }
 }
 
+// Get student's application cycle from Module 0 question 16 (e.g. "2027-2028")
+async function getApplicationCycleForUser(userId) {
+  try {
+    const context = await getModule0ContextForUser(userId);
+    const cycle = context && context.allAnswers && context.allAnswers['16'];
+    if (cycle && typeof cycle === 'string' && cycle.trim()) return cycle.trim();
+    return null;
+  } catch (_) { return null; }
+}
+
+// Build Module 0 context string and merged answers for college match
+async function getModule0ContextForUser(userId) {
+  try {
+    let responses = await db.getResponsesByUserId(userId);
+    if (!responses || responses.length === 0) {
+      const all = readJSONFile(RESPONSES_FILE);
+      const list = Array.isArray(all) ? all : [];
+      const uid = String(userId || '');
+      responses = list.filter(r => r && String(r.userId || '') === uid);
+    }
+    const toTime = (r) => {
+      const t = r.timestamp || r.submittedAt;
+      if (!t) return 0;
+      const ms = new Date(t).getTime();
+      return Number.isNaN(ms) ? 0 : ms;
+    };
+    // Match module-0 by moduleId or legacy 'module' field (case-insensitive)
+    const norm = (v) => String(v || '').trim().toLowerCase();
+    let module0 = responses
+      .filter(r => norm(r.moduleId || r.module) === 'module-0')
+      .sort((a, b) => toTime(b) - toTime(a));
+    if (module0.length === 0) {
+      // Fallback: use most recent response (legacy responses may lack moduleId)
+      const anySorted = responses.slice().sort((a, b) => toTime(b) - toTime(a));
+      if (anySorted.length === 0) return null;
+      module0 = [anySorted[0]];
+    }
+    const mostRecent = module0[0];
+    const merged = { ...(mostRecent.answers || {}) };
+    if (Object.keys(merged).length === 0) return null;
+
+    let questions = await db.getQuestions();
+    if (!questions || questions.length === 0) questions = readJSONFile(QUESTIONS_FILE);
+    const questionsMap = {};
+    (questions || []).forEach(q => { if (q && q.id != null) questionsMap[String(q.id)] = q; });
+
+    const systemFields = ['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions', 'postCollegeAnswers'];
+    let allAnswersFormatted = Object.entries(merged)
+      .filter(([key]) => !systemFields.includes(key))
+      .map(([qId, ans]) => {
+        const q = questionsMap[qId] || questionsMap[String(qId)];
+        const qText = q ? q.text : qId;
+        const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans ?? '');
+        if (!formattedAns || formattedAns.trim() === '') return null;
+        if (q && q.chatPrompt && q.chatPrompt.includes('{answer}')) return q.chatPrompt.replace(/{answer}/g, formattedAns);
+        return `${qText}: ${formattedAns}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+    if (!allAnswersFormatted || !allAnswersFormatted.trim()) {
+      allAnswersFormatted = Object.entries(merged)
+        .filter(([key]) => !systemFields.includes(key))
+        .map(([qId, ans]) => {
+          const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans ?? '');
+          if (!formattedAns || formattedAns.trim() === '') return null;
+          return `Question ${qId}: ${formattedAns}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
+    return { allAnswersFormatted, allAnswers: merged };
+  } catch (err) {
+    console.error('Error building Module 0 context:', err);
+    return null;
+  }
+}
+
 // College recommendations endpoint (special endpoint for initial college suggestions)
+// Always uses the most recent Module 0 submission from the server (not client-sent data).
 app.post('/api/chat/colleges', requireLogin, async (req, res) => {
   try {
-    const { responseData } = req.body;
-    
-    if (!responseData || !responseData.answers) {
-      return res.status(400).json({
-        success: false,
-        message: 'Response data is required'
-      });
-    }
-
-    // Check if Claude is available
     if (!hasLLM) {
       return res.status(500).json({
         success: false,
@@ -1293,37 +2539,17 @@ app.post('/api/chat/colleges', requireLogin, async (req, res) => {
       });
     }
 
-    // Get questions to access question-specific prompts
-    const questions = readJSONFile(QUESTIONS_FILE);
-    const questionsMap = {};
-    questions.forEach(q => {
-      questionsMap[q.id] = q;
-    });
+    const context = await getModule0ContextForUser(req.session.userId);
+    const responseSummary = (context && context.allAnswersFormatted && context.allAnswersFormatted.trim())
+      ? context.allAnswersFormatted
+      : null;
 
-    // Format questionnaire responses for ChatGPT using question-specific prompts
-    const responseSummary = Object.entries(responseData.answers)
-      .map(([questionId, value]) => {
-        const question = questionsMap[questionId];
-        const questionText = question ? question.text : questionId;
-        
-        // Format the value
-        let formattedValue;
-        if (Array.isArray(value)) {
-          formattedValue = value.join(', ');
-        } else {
-          formattedValue = value;
-        }
-        
-        // Use question-specific prompt if available, otherwise use default format
-        if (question && question.chatPrompt && question.chatPrompt.trim()) {
-          // Replace {answer} placeholder with the actual answer
-          return question.chatPrompt.replace(/{answer}/g, formattedValue);
-        }
-        
-        // Default format
-        return `${questionText}: ${formattedValue}`;
-      })
-      .join('\n');
+    if (!responseSummary) {
+      return res.status(400).json({
+        success: false,
+        message: 'Complete Module 0 (Initial Diagnostic) first to get college recommendations.'
+      });
+    }
 
     // Create a specialized prompt for college recommendations
     const collegePrompt = `Based on the following questionnaire responses from a student, recommend 3-5 colleges or universities that would be a good fit. Explain why each college is a good match based on their responses. Be specific and personalized.
@@ -1368,6 +2594,7 @@ Format your response as a list with clear explanations.`;
 });
 
 // College list with details - multi-step flow: (1) get list, (2) get details for each, (3) format
+// Uses most recent Module 0 submission from server for questionnaire context.
 app.post('/api/chat/colleges-detailed', requireLogin, async (req, res) => {
   try {
     const { allAnswers, listPrompt } = req.body;
@@ -1379,31 +2606,34 @@ app.post('/api/chat/colleges-detailed', requireLogin, async (req, res) => {
       });
     }
 
-    // Load questions for formatting answers
-    const questions = readJSONFile(QUESTIONS_FILE);
-    const questionsMap = {};
-    questions.forEach(q => { questionsMap[q.id] = q; });
+    const module0Context = await getModule0ContextForUser(req.session.userId);
+    let allAnswersFormatted = (module0Context && module0Context.allAnswersFormatted && module0Context.allAnswersFormatted.trim())
+      ? module0Context.allAnswersFormatted
+      : '';
 
-    let postCollegeQuestionsMap = {};
-    try {
-      const postCollegeData = await db.getPostCollegeMessages();
-      if (postCollegeData && postCollegeData.questions && Array.isArray(postCollegeData.questions)) {
-        postCollegeData.questions.forEach(q => { postCollegeQuestionsMap[q.id] = q; });
-      }
-    } catch (err) {
-      console.error('Error loading post-college questions:', err);
+    if (!allAnswersFormatted && (!allAnswers || Object.keys(allAnswers || {}).length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Complete Module 0 (Initial Diagnostic) first to get college recommendations.'
+      });
     }
 
-    const allQuestionsMap = { ...questionsMap, ...postCollegeQuestionsMap };
-    const systemFields = ['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions'];
-
-    // Format allAnswers for context
-    let allAnswersFormatted = '';
-    if (allAnswers && Object.keys(allAnswers).length > 0) {
+    if (!allAnswersFormatted && allAnswers && Object.keys(allAnswers).length > 0) {
+      const questions = readJSONFile(QUESTIONS_FILE);
+      const questionsMap = {};
+      (questions || []).forEach(q => { questionsMap[q.id] = q; });
+      let postCollegeQuestionsMap = {};
+      try {
+        const postCollegeData = await db.getPostCollegeMessages();
+        if (postCollegeData && postCollegeData.questions && Array.isArray(postCollegeData.questions)) {
+          postCollegeData.questions.forEach(q => { postCollegeQuestionsMap[q.id] = q; });
+        }
+      } catch (err) { console.error('Error loading post-college questions:', err); }
+      const allQuestionsMap = { ...questionsMap, ...postCollegeQuestionsMap };
+      const systemFields = ['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions'];
       const regularAnswers = { ...allAnswers };
       const postCollegeAnswers = regularAnswers.postCollegeAnswers || {};
       delete regularAnswers.postCollegeAnswers;
-
       const regularFormatted = Object.entries(regularAnswers)
         .filter(([qId, ans]) => {
           if (systemFields.includes(qId)) return false;
@@ -1416,35 +2646,61 @@ app.post('/api/chat/colleges-detailed', requireLogin, async (req, res) => {
           const qText = q ? q.text : qId;
           const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans);
           if (!formattedAns || formattedAns.trim() === '') return null;
-          if (q && q.chatPrompt && q.chatPrompt.trim()) {
-            return q.chatPrompt.replace(/{answer}/g, formattedAns);
-          }
+          if (q && q.chatPrompt && q.chatPrompt.trim()) return q.chatPrompt.replace(/{answer}/g, formattedAns);
           return `${qText}: ${formattedAns}`;
         })
         .filter(Boolean)
         .join('\n');
-
       const postCollegeFormatted = Object.entries(postCollegeAnswers)
         .map(([qId, ans]) => {
           const q = allQuestionsMap[qId] || postCollegeQuestionsMap[qId];
           const qText = q ? q.text : qId;
           const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans);
-          if (q && q.chatPrompt && q.chatPrompt.trim()) {
-            return q.chatPrompt.replace(/{answer}/g, formattedAns);
-          }
+          if (q && q.chatPrompt && q.chatPrompt.trim()) return q.chatPrompt.replace(/{answer}/g, formattedAns);
           return `${qText}: ${formattedAns}`;
         })
         .filter(t => t && t.trim())
         .join('\n');
-
-      if (regularFormatted && regularFormatted.trim()) {
-        allAnswersFormatted += 'Regular questionnaire answers:\n' + regularFormatted;
-      }
+      if (regularFormatted && regularFormatted.trim()) allAnswersFormatted += 'Regular questionnaire answers:\n' + regularFormatted;
       if (postCollegeFormatted && postCollegeFormatted.trim()) {
         if (allAnswersFormatted) allAnswersFormatted += '\n\n';
         allAnswersFormatted += 'Post-college question answers:\n' + postCollegeFormatted;
       }
+    } else if (allAnswersFormatted && allAnswers && (allAnswers.postCollegeAnswers || {}) && Object.keys(allAnswers.postCollegeAnswers || {}).length > 0) {
+      const questions = readJSONFile(QUESTIONS_FILE);
+      const questionsMap = {};
+      (questions || []).forEach(q => { questionsMap[q.id] = q; });
+      let postCollegeQuestionsMap = {};
+      try {
+        const postCollegeData = await db.getPostCollegeMessages();
+        if (postCollegeData && postCollegeData.questions && Array.isArray(postCollegeData.questions)) {
+          postCollegeData.questions.forEach(q => { postCollegeQuestionsMap[q.id] = q; });
+        }
+      } catch (err) { console.error('Error loading post-college questions:', err); }
+      const postCollegeAnswers = allAnswers.postCollegeAnswers || {};
+      const postCollegeFormatted = Object.entries(postCollegeAnswers)
+        .map(([qId, ans]) => {
+          const q = postCollegeQuestionsMap[qId] || questionsMap[qId];
+          const qText = q ? q.text : qId;
+          const formattedAns = Array.isArray(ans) ? ans.join(', ') : String(ans);
+          if (q && q.chatPrompt && q.chatPrompt.trim()) return q.chatPrompt.replace(/{answer}/g, formattedAns);
+          return `${qText}: ${formattedAns}`;
+        })
+        .filter(t => t && t.trim())
+        .join('\n');
+      if (postCollegeFormatted && postCollegeFormatted.trim()) {
+        allAnswersFormatted += '\n\nPost-college question answers:\n' + postCollegeFormatted;
+      }
     }
+
+    let collegeListFormatted = 'No colleges added yet.';
+    try {
+      const listUser = await db.getUserById(req.session.userId);
+      const list = (listUser && listUser.collegeList && Array.isArray(listUser.collegeList)) ? listUser.collegeList : [];
+      if (list.length > 0) {
+        collegeListFormatted = list.map(c => c.blurb ? `${(c.name || '').trim()}: ${(c.blurb || '').trim()}` : (c.name || '').trim()).filter(Boolean).join('\n');
+      }
+    } catch (_) {}
 
     // Step 1: Get list of colleges
     const defaultListPrompt = `Based on the following questionnaire responses from a student, provide a list of 5-8 college or university names that would be a good fit. Return ONLY the college names, one per line, no numbering, bullets, or extra text.
@@ -1453,7 +2709,7 @@ Student's questionnaire responses:
 ${allAnswersFormatted || 'No responses yet.'}`;
 
     const listPromptToUse = (listPrompt && listPrompt.trim())
-      ? listPrompt.replace(/{allAnswers}/g, allAnswersFormatted || 'No responses yet.')
+      ? replaceInsightPlaceholders(listPrompt.replace(/{allAnswers}/g, allAnswersFormatted || 'No responses yet.').replace(/\{collegeList\}/g, collegeListFormatted))
       : defaultListPrompt;
 
     const listText = await chatComplete(
@@ -1775,8 +3031,17 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
         }
       }
       
-      // Replace {ragResults} placeholder in the prompt
-      let finalPrompt = contextPrompt.replace(/{ragResults}/g, ragResults || 'No RAG results available.');
+      let collegeListFormattedQ = 'No colleges added yet.';
+      try {
+        const qUser = await db.getUserById(req.session.userId);
+        const qList = (qUser && qUser.collegeList && Array.isArray(qUser.collegeList)) ? qUser.collegeList : [];
+        if (qList.length > 0) {
+          collegeListFormattedQ = qList.map(c => c.blurb ? `${(c.name || '').trim()}: ${(c.blurb || '').trim()}` : (c.name || '').trim()).filter(Boolean).join('\n');
+        }
+      } catch (_) {}
+      let finalPrompt = contextPrompt
+        .replace(/{ragResults}/g, ragResults || 'No RAG results available.')
+        .replace(/\{collegeList\}/g, collegeListFormattedQ);
       
       // Debug: Log the final prompt being sent to ChatGPT
       console.log('Final prompt to Claude:');
@@ -1817,6 +3082,113 @@ app.post('/api/chat/question', requireLogin, async (req, res) => {
   }
 });
 
+// Run a post-college question's prompt and return the AI output (for Module 1 counselor flow)
+app.post('/api/chat/run-post-college', requireLogin, async (req, res) => {
+  try {
+    const { questionId, userResponses } = req.body;
+    if (!questionId) {
+      return res.status(400).json({ success: false, message: 'questionId is required' });
+    }
+    if (!hasLLM) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI integration is not available. Set ANTHROPIC_API_KEY in .env and restart the server.'
+      });
+    }
+    let userResponse = userResponses || await getUserResponsesForContext(req.session.userId);
+    if (Array.isArray(userResponse)) {
+      const merged = { answers: {}, postCollegeAnswers: {} };
+      userResponse.forEach(r => {
+        Object.assign(merged.answers, r.answers || r);
+        if (r.postCollegeAnswers) Object.assign(merged.postCollegeAnswers, r.postCollegeAnswers);
+      });
+      userResponse = merged;
+    }
+    const answers = (userResponse && userResponse.answers) || userResponse || {};
+    const postCollegeAnswers = (userResponse && userResponse.postCollegeAnswers) || {};
+    const allAnswers = { ...answers, ...postCollegeAnswers };
+
+    let postCollegeData = null;
+    try {
+      postCollegeData = await db.getPostCollegeMessages();
+    } catch (e) { /* ignore */ }
+    if (!postCollegeData || !postCollegeData.questions) {
+      try {
+        postCollegeData = readJSONFile(POST_COLLEGE_MESSAGES_FILE);
+      } catch (e) {
+        return res.status(400).json({ success: false, message: 'Post-college questions not configured. Add them in Admin.' });
+      }
+    }
+    const pcQuestions = Array.isArray(postCollegeData.questions) ? postCollegeData.questions : [];
+    const question = pcQuestions.find(q => q && q.id === questionId);
+    if (!question || !question.chatPrompt) {
+      return res.status(400).json({ success: false, message: 'Question not found or has no prompt.' });
+    }
+
+    let questions = [];
+    try {
+      const qResult = await db.getQuestions();
+      if (Array.isArray(qResult)) questions = qResult;
+      else if (!questions.length) questions = readJSONFile(QUESTIONS_FILE);
+    } catch (e) {
+      try { questions = readJSONFile(QUESTIONS_FILE); } catch (e2) { questions = []; }
+    }
+    if (!Array.isArray(questions)) questions = [];
+    const questionsMap = {};
+    questions.forEach(q => { if (q && q.id) questionsMap[q.id] = q; });
+    const postCollegeMap = {};
+    pcQuestions.forEach(q => { if (q && q.id) postCollegeMap[q.id] = q; });
+    const allQuestionsMap = { ...questionsMap, ...postCollegeMap };
+
+    const responseSummary = Object.entries(allAnswers)
+      .filter(([key]) => key && !['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions', 'postCollegeAnswers'].includes(key))
+      .map(([qId, value]) => {
+        const q = allQuestionsMap[qId];
+        const text = (q && q.text) || qId;
+        const formatted = Array.isArray(value) ? value.join(', ') : String(value ?? '');
+        return (q && q.chatPrompt && typeof q.chatPrompt === 'string' && q.chatPrompt.includes('{answer}'))
+          ? q.chatPrompt.replace(/{answer}/g, formatted)
+          : `${text}: ${formatted}`;
+      })
+      .filter(t => t && t.trim())
+      .join('\n');
+
+    const allAnswersStr = responseSummary || 'No responses yet.';
+    const directPrompt = replaceInsightPlaceholders(
+      String(question.chatPrompt || '')
+        .replace(/{allAnswers}/g, allAnswersStr)
+        .replace(/\{q:([^}]+)\}/g, (_, qId) => {
+          const ans = allAnswers[(qId || '').trim()];
+          return ans != null ? (Array.isArray(ans) ? ans.join(', ') : String(ans)) : '';
+        })
+    );
+
+    let result;
+    try {
+      result = await chatComplete(
+        'You are a college counselor. Follow the instructions exactly. Return only what is asked for.',
+        directPrompt,
+        { maxTokens: 2048, temperature: 0.7 }
+      );
+    } catch (apiError) {
+      console.error('run-post-college Claude API error:', apiError);
+      const msg = apiError.message || String(apiError);
+      return res.status(500).json({
+        success: false,
+        message: msg.includes('API key') ? 'AI is not configured. Check ANTHROPIC_API_KEY.' : (msg || 'AI request failed. Try again.')
+      });
+    }
+
+    res.json({ success: true, message: result || '' });
+  } catch (error) {
+    console.error('run-post-college error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to run post-college question'
+    });
+  }
+});
+
 // Counselor chat endpoint (combines preset prompts with ChatGPT)
 app.post('/api/chat', requireLogin, async (req, res) => {
   try {
@@ -1845,6 +3217,41 @@ app.post('/api/chat', requireLogin, async (req, res) => {
         // Get user's questionnaire responses for context
         // Prefer userResponses from client, fallback to database lookup
         let userResponse = userResponses || await getUserResponsesForContext(req.session.userId);
+        if (Array.isArray(userResponse)) {
+          const merged = { answers: {}, postCollegeAnswers: {} };
+          userResponse.forEach(r => {
+            Object.assign(merged.answers, r.answers || r);
+            if (r.postCollegeAnswers) Object.assign(merged.postCollegeAnswers, r.postCollegeAnswers);
+          });
+          userResponse = merged;
+        }
+        
+        let postCollegeQuestionsMap = {};
+        let responseSummary = '';
+        let allAnswers = {};
+        let collegeListFormatted = 'No colleges added yet.';
+        try {
+          const chatUser = await db.getUserById(req.session.userId);
+          const list = (chatUser && chatUser.collegeList && Array.isArray(chatUser.collegeList)) ? chatUser.collegeList : [];
+          if (list.length > 0) {
+            collegeListFormatted = list.map(c => c.blurb ? `${(c.name || '').trim()}: ${(c.blurb || '').trim()}` : (c.name || '').trim()).filter(Boolean).join('\n');
+          }
+        } catch (_) {}
+
+        // Load post-college questions (always, for routing college/scholarship queries)
+        try {
+          const postCollegeData = await db.getPostCollegeMessages();
+          if (postCollegeData && postCollegeData.questions && Array.isArray(postCollegeData.questions)) {
+            postCollegeData.questions.forEach(q => { postCollegeQuestionsMap[q.id] = q; });
+          }
+        } catch (err) {
+          try {
+            const postCollegeFile = readJSONFile(POST_COLLEGE_MESSAGES_FILE);
+            if (postCollegeFile && postCollegeFile.questions) {
+              postCollegeFile.questions.forEach(q => { postCollegeQuestionsMap[q.id] = q; });
+            }
+          } catch (e) { /* ignore */ }
+        }
         
         // Build system prompt with context
         let systemPrompt = prompts.systemPrompt || "You are a helpful counselor assistant. Provide guidance and support.";
@@ -1853,9 +3260,8 @@ app.post('/api/chat', requireLogin, async (req, res) => {
           // Get questions to access question-specific prompts
           const questions = readJSONFile(QUESTIONS_FILE);
           const questionsMap = {};
-          questions.forEach(q => {
-            questionsMap[q.id] = q;
-          });
+          questions.forEach(q => { questionsMap[q.id] = q; });
+          const allQuestionsMap = { ...questionsMap, ...postCollegeQuestionsMap };
           
           // Get answers from userResponse (could be in 'answers' field or directly in response)
           const answers = userResponse.answers || userResponse;
@@ -1870,7 +3276,7 @@ app.post('/api/chat', requireLogin, async (req, res) => {
           const responseSummary = Object.entries(allAnswers)
             .filter(([key]) => !['id', 'userId', 'username', 'timestamp', 'submittedAt', 'questions', 'postCollegeAnswers'].includes(key))
             .map(([questionId, value]) => {
-              const question = questionsMap[questionId];
+              const question = allQuestionsMap[questionId];
               const questionText = question ? question.text : questionId;
               
               // Format the value
@@ -1878,22 +3284,50 @@ app.post('/api/chat', requireLogin, async (req, res) => {
               if (Array.isArray(value)) {
                 formattedValue = value.join(', ');
               } else {
-                formattedValue = value;
+                formattedValue = String(value ?? '');
               }
               
-              // Use question-specific prompt if available, otherwise use default format
-              if (question && question.chatPrompt && question.chatPrompt.trim()) {
-                // Replace {answer} placeholder with the actual answer
+              // Use question-specific prompt only if it has {answer} (post-college use {allAnswers} differently)
+              if (question && question.chatPrompt && question.chatPrompt.includes('{answer}')) {
                 return question.chatPrompt.replace(/{answer}/g, formattedValue);
               }
               
               // Default format
               return `${questionText}: ${formattedValue}`;
             })
+            .filter(t => t && t.trim())
             .join('\n');
           
-          systemPrompt += `\n\nUser's questionnaire responses:\n${responseSummary}`;
+          systemPrompt += `\n\nStudent's Initial Diagnostic (Module 0) and questionnaire responses:\n${responseSummary}`;
+
+          // Always include college list in context when available
+          if (collegeListFormatted && collegeListFormatted !== 'No colleges added yet.') {
+            systemPrompt += `\n\nStudent's college list:\n${collegeListFormatted}`;
+          }
+
+          // Add post-college question prompts for college/scholarship guidance
+          const postCollegeQuestions = Object.values(postCollegeQuestionsMap);
+          if (postCollegeQuestions.length > 0) {
+            const allAnswersForPrompts = responseSummary || 'No responses yet.';
+            const postCollegeInstructions = postCollegeQuestions
+              .filter(q => q.chatPrompt && q.chatPrompt.trim())
+              .map(q => {
+                let prompt = q.chatPrompt
+                  .replace(/{allAnswers}/g, allAnswersForPrompts)
+                  .replace(/\{collegeList\}/g, collegeListFormatted)
+                  .replace(/\{q:([^}]+)\}/g, (_, qId) => {
+                    const ans = allAnswers[qId.trim()];
+                    return ans != null ? (Array.isArray(ans) ? ans.join(', ') : String(ans)) : '';
+                  });
+                return `When user asks about "${q.text}": ${prompt}`;
+              })
+              .join('\n\n');
+            if (postCollegeInstructions) {
+              systemPrompt += `\n\nPost-college guidance prompts (use when relevant):\n${postCollegeInstructions}`;
+            }
+          }
         }
+        systemPrompt = systemPrompt.replace(/\{studentInsights\}/g, (getAppSettings().studentInsights || ''));
         
         // Build messages array for Claude
         const messages = [
@@ -1915,12 +3349,45 @@ app.post('/api/chat', requireLogin, async (req, res) => {
         
         // Add current user message
         messages.push({ role: 'user', content: message });
-        
-        const chatGPTResponse = await chatCompleteWithMessages(
-          systemPrompt,
-          messages.filter(m => m.role !== 'system'),
-          { maxTokens: 2048, temperature: 0.7 }
-        );
+
+        // Route college/scholarship queries to post-college prompts (use as direct prompt)
+        const msgLower = message.toLowerCase().trim();
+        const isCollegeQuery = /\b(college|colleges|university|universities|schools?|recommendations?|where should i (go|apply)|fit for me)\b/.test(msgLower);
+        const isScholarshipQuery = /\b(scholarship|scholarships|financial aid|grants?|money for college)\b/.test(msgLower);
+        const postCollegeQuestions = Object.values(postCollegeQuestionsMap || {});
+        let matchedPostCollege = null;
+        if (isCollegeQuery && postCollegeQuestions.length > 0) {
+          matchedPostCollege = postCollegeQuestions.find(q => /college|recommendation/i.test(q.text || ''));
+        }
+        if (isScholarshipQuery && !matchedPostCollege && postCollegeQuestions.length > 0) {
+          matchedPostCollege = postCollegeQuestions.find(q => /scholarship/i.test(q.text || ''));
+        }
+
+        let chatGPTResponse;
+        if (matchedPostCollege && matchedPostCollege.chatPrompt) {
+          const allAnswersForPrompt = responseSummary || 'No responses yet.';
+          const directPrompt = replaceInsightPlaceholders(
+            matchedPostCollege.chatPrompt
+              .replace(/{allAnswers}/g, allAnswersForPrompt)
+              .replace(/\{collegeList\}/g, collegeListFormatted)
+              .replace(/\{q:([^}]+)\}/g, (_, qId) => {
+                const ans = allAnswers[qId.trim()];
+                return ans != null ? (Array.isArray(ans) ? ans.join(', ') : String(ans)) : '';
+              })
+          );
+          chatGPTResponse = await chatComplete(
+            'You are a college counselor. Follow the instructions exactly. Return only what is asked for.',
+            directPrompt,
+            { maxTokens: 2048, temperature: 0.7 }
+          );
+          console.log(`Chat: used post-college prompt for "${matchedPostCollege.text}"`);
+        } else {
+          chatGPTResponse = await chatCompleteWithMessages(
+            systemPrompt,
+            messages.filter(m => m.role !== 'system'),
+            { maxTokens: 2048, temperature: 0.7 }
+          );
+        }
         
         // Combine preset and Claude responses based on weights
         const presetWeight = prompts.presetWeight || 0.3;
@@ -2090,6 +3557,60 @@ app.post('/api/rag/query', requireLogin, async (req, res) => {
   }
 });
 
+// Run RAG analysis (e.g. similarities between students who got in, GPA/SAT patterns).
+// Returns answer and sources. Optionally save the answer so it is injected into prompts as {studentInsights}.
+app.post('/api/rag/analyze', requireLogin, async (req, res) => {
+  try {
+    const { query, moduleText = '', topK = 8, saveToInsights = false, insightName = '' } = req.body;
+
+    if (!query || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Query is required',
+        answer: '',
+        sources: []
+      });
+    }
+
+    if (!ragQueryHandler) {
+      return res.status(500).json({
+        success: false,
+        message: 'RAG system not initialized. Configure OpenAI for embeddings and upload student application/outcome documents first.',
+        answer: '',
+        sources: []
+      });
+    }
+
+    const result = await ragQueryHandler.query(query.trim(), {
+      topK: Math.min(20, Math.max(1, topK)),
+      temperature: 0.5,
+      maxTokens: 2048,
+      moduleText: typeof moduleText === 'string' ? moduleText : ''
+    });
+
+    if (saveToInsights && result.success && result.message) {
+      const settings = getAppSettings();
+      setAppSettings({ ...settings, studentInsights: result.message });
+    }
+
+    res.json({
+      success: result.success,
+      message: result.message || result.success ? '' : 'No relevant documents found.',
+      answer: result.success ? result.message : (result.message || ''),
+      sources: result.sources || [],
+      savedToInsights: !!(saveToInsights && result.success && result.message)
+    });
+  } catch (error) {
+    console.error('Error in RAG analyze:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to run analysis: ' + error.message,
+      answer: '',
+      sources: []
+    });
+  }
+});
+
 // Get all uploaded documents
 app.get('/api/rag/documents', requireLogin, (req, res) => {
   try {
@@ -2201,7 +3722,8 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Data stored in: ${DATA_DIR}`);
   console.log(`Session secret configured: ${!!process.env.SESSION_SECRET}`);
   console.log(`MongoDB URI configured: ${!!process.env.MONGODB_URI}`);
-  
+  console.log(`Claude (AI chat) enabled: ${hasLLM} ${!hasLLM ? '- set ANTHROPIC_API_KEY in .env to enable' : ''}`);
+
   // Connect to MongoDB on startup
   try {
     const database = await db.connectToDatabase();

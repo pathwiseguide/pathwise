@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Management - Pathwise</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
         .admin-container {
             background: white;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
             max-width: 1200px;
             margin: 0 auto;
         }
@@ -20,22 +20,22 @@
         }
 
         .admin-header h1 {
-            color: #667eea;
+            color: #4285F4;
             margin-bottom: 10px;
         }
 
         .upload-section {
-            border: 2px dashed #667eea;
-            border-radius: 8px;
+            border: 2px dashed rgba(66, 133, 244, 0.4);
+            border-radius: 16px;
             padding: 40px;
             text-align: center;
             margin-bottom: 30px;
-            background: #f8f9ff;
+            background: rgba(66, 133, 244, 0.03);
         }
 
         .upload-section.dragover {
-            background: #e8ebff;
-            border-color: #5568d3;
+            background: rgba(66, 133, 244, 0.08);
+            border-color: rgba(66, 133, 244, 0.6);
         }
 
         .upload-section input[type="file"] {
@@ -43,18 +43,18 @@
         }
 
         .upload-btn {
-            background: #667eea;
+            background: #4285F4;
             color: white;
             border: none;
             padding: 15px 30px;
-            border-radius: 6px;
+            border-radius: 12px;
             font-size: 1.1em;
             cursor: pointer;
             margin: 10px;
         }
 
         .upload-btn:hover {
-            background: #5568d3;
+            background: #3367d6;
         }
 
         .upload-btn:disabled {
@@ -67,8 +67,8 @@
         }
 
         .document-item {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
             padding: 20px;
             margin-bottom: 15px;
             background: #f9f9f9;
@@ -184,7 +184,9 @@
 <body>
     <div class="container">
         <nav class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
                 <a href="/admin.html">Edit Questions</a>
                 <a href="/documents.html">Documents</a>
@@ -194,7 +196,7 @@
         <div class="admin-container">
             <div class="admin-header">
                 <h1>Document Management</h1>
-                <p>Upload PDF documents to build your knowledge base. The system will process and index them for AI-powered queries.</p>
+                <p>Upload PDF documents to build your knowledge base. The system will process and index them for AI-powered queries. Use student applications and outcomes (who got in/rejected where) to run backend analysis; insights can be injected into ChatGPT/Claude prompts via the <strong>{studentInsights}</strong> placeholder.</p>
             </div>
 
             <div id="message" class="message"></div>

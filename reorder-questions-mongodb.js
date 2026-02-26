@@ -18,6 +18,7 @@ const ORDERED_IDS = [
   '1765772367077',        // What city and state do you currently reside in?
   '1765772344326',        // What school do you currently attend?
   '1765772762906',        // Give any details about your high school.
+  '16',                   // Which application cycle are you in?
   '1765772397699',        // What's your current GPA?
   '1765772638610',        // What courses do you currently take?
   '1765772688681',        // What courses have you taken in the past?

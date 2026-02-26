@@ -9,6 +9,13 @@ const errorMessage = document.getElementById('errorMessage');
 const registerErrorMessage = document.getElementById('registerErrorMessage');
 const registerSuccessMessage = document.getElementById('registerSuccessMessage');
 
+function getReturnUrl() {
+    const params = new URLSearchParams(location.search);
+    const ret = params.get('return');
+    if (ret) return ret.startsWith('/') ? ret : '/' + ret;
+    return '/';
+}
+
 // Check if already logged in
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -18,12 +25,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await response.json();
         
         if (data.authenticated) {
-            // Already logged in, redirect to main page
-            window.location.href = '/';
+            window.location.href = getReturnUrl();
+            return;
         }
     } catch (error) {
         console.error('Auth check error:', error);
-        // Continue to show login page
+    }
+    
+    const params = new URLSearchParams(location.search);
+    if (params.get('show') === 'register') {
+        showRegisterForm();
     }
     
     setupEventListeners();
@@ -62,6 +73,13 @@ function showRegisterForm() {
     loginForm.style.display = 'none';
     registerForm.style.display = 'block';
     clearMessages();
+    const fromModule0 = !!sessionStorage.getItem('pathwisePendingModule0');
+    const sub = document.getElementById('registerSubtitle');
+    const msg = document.getElementById('signupResultsMsg');
+    if (sub) sub.style.display = fromModule0 ? 'none' : 'block';
+    if (msg) {
+        msg.style.display = fromModule0 ? 'block' : 'none';
+    }
 }
 
 // Show login form
@@ -184,11 +202,26 @@ async function handleRegister(e) {
         const data = await response.json();
         
         if (data.success) {
-            // Registration successful, show success message and redirect
             showSuccess('Account created successfully! Redirecting...');
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 1000);
+            const returnUrl = getReturnUrl();
+            const pending = sessionStorage.getItem('pathwisePendingModule0');
+            if (pending) {
+                try {
+                    const payload = JSON.parse(pending);
+                    const saveRes = await fetch('/api/responses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            answers: payload.answers,
+                            questions: payload.questions || [],
+                            moduleId: payload.moduleId
+                        })
+                    });
+                    if (saveRes.ok) sessionStorage.removeItem('pathwisePendingModule0');
+                } catch (err) { console.error('Failed to save Module 0:', err); }
+            }
+            setTimeout(() => { window.location.href = returnUrl; }, 800);
         } else {
             showError(data.message || 'Registration failed. Please try again.', true);
         }

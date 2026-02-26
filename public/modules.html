@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modules - Pathwise</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .modules-home { padding: 40px 0; }
+        .modules-home h1 { font-family: var(--font-heading); font-size: 2.5rem; color: #000; text-align: center; margin-bottom: 12px; }
+        .modules-home p { text-align: center; color: #666; margin-bottom: 40px; font-size: 1.1rem; }
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+        .module-btn { display: block; padding: 28px 24px; background: white; border: 1px solid rgba(0,0,0,0.08); border-radius: 16px; text-align: center; text-decoration: none; color: #333; font-weight: 600; font-size: 1.2rem; transition: all 0.25s ease; box-shadow: 0 2px 16px rgba(0,0,0,0.04); cursor: pointer; }
+        .module-btn:hover { border-color: rgba(66,133,244,0.3); transform: translateY(-4px); box-shadow: 0 8px 32px rgba(66,133,244,0.1); color: #000; }
+        .module-btn span { display: block; font-size: 0.9rem; font-weight: 500; color: #666; margin-top: 8px; }
+        .module-btn:hover span { color: #333; }
+    </style>
+</head>
+<body class="fp-page">
+    <div class="container">
+        <nav class="nav-header">
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
+            <div class="nav-links">
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink" style="display: block;">Pricing</a>
+                <a href="/login.html" id="loginLink" class="auth-button">Login</a>
+                <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
+            </div>
+        </nav>
+
+        <div class="modules-home">
+            <h1>Tools</h1>
+            <p>Choose a tool to get started</p>
+            <div id="modulesGrid" class="modules-grid">
+                <div class="loading" style="grid-column: 1/-1; text-align: center; padding: 40px;">Loading tools...</div>
+            </div>
+            <!-- Static module links (work even if JS fails). Hidden when grid loads. -->
+            <div id="modulesFallback" class="modules-grid" style="display: none; margin-top: 24px;">
+                <a href="/module/module-0" class="module-btn">Initial Diagnostic</a>
+                <a href="/module/module-1" class="module-btn">College Match</a>
+                <a href="/module/module-2" class="module-btn">Making a Common App account</a>
+                <a href="/module/module-3" class="module-btn">Developing your Character</a>
+                <a href="/module/module-4" class="module-btn">Essay Writing</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (async function() {
+            var grid = document.getElementById('modulesGrid');
+            var fallback = document.getElementById('modulesFallback');
+            try {
+                var res = await fetch('/api/course', { credentials: 'include' });
+                if (!res.ok) throw new Error('Course API ' + res.status);
+                var course = await res.json();
+                var modules = (course.modules || []).sort(function(a, b) { return (a.order ?? 0) - (b.order ?? 0); });
+                grid.innerHTML = '';
+                if (modules.length === 0) {
+                    grid.innerHTML = '<p style="text-align:center;color:#666;">No modules configured.</p>';
+                    if (fallback) fallback.style.display = 'grid';
+                    return;
+                }
+                modules.forEach(function(mod, i) {
+                    var id = mod.id || ('module-' + i);
+                    var a = document.createElement('a');
+                    a.href = '/module/' + encodeURIComponent(id);
+                    a.className = 'module-btn';
+                    a.setAttribute('data-module-id', id);
+                    a.textContent = mod.title || '';
+                    var span = document.createElement('span');
+                    span.textContent = mod.description || '';
+                    a.appendChild(span);
+                    grid.appendChild(a);
+                });
+            } catch (e) {
+                console.error(e);
+                grid.innerHTML = '<p style="text-align:center;color:#666;grid-column:1/-1;">Failed to load tools. Use the links below:</p>';
+                if (fallback) fallback.style.display = 'grid';
+            }
+        })();
+    </script>
+    <script src="/nav-modules.js"></script>
+    <script src="/chat-widget.js"></script>
+    <script src="/tutorial.js"></script>
+</body>
+</html>

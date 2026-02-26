@@ -3,338 +3,272 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pathwise - Home</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <title>Pathwise - College Counseling Made Easy</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <style>
-        .hero-section {
-            text-align: center;
-            padding: 80px 20px;
-            color: #333;
-        }
-
-        @keyframes heroTitleIn {
-            from {
-                opacity: 0;
-                transform: translateY(24px) scale(0.97);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        @keyframes heroSubtitleIn {
-            from {
-                opacity: 0;
-                transform: translateY(16px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes heroSubtitleGlow {
-            0%, 100% { opacity: 0.92; }
-            50% { opacity: 1; }
-        }
+        /* Blue + yellow theme - balanced and pretty */
+        body.fp-page { --fp-blue: #4285F4; --fp-purple: #4285F4; --fp-green: #28A745; --fp-yellow: #F7B500; --fp-red: #dc3545; --fp-bg: #f5f5f7; background: linear-gradient(180deg, rgba(66,133,244,0.04) 0%, #f5f5f7 25% 100%); background-attachment: fixed; }
         
-        .hero-section h1 {
-            font-family: 'DM Serif Display', serif;
-            font-size: 4rem;
-            font-weight: 700;
-            margin-bottom: 20px;
-            color: #000;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-            animation: heroTitleIn 0.8s ease-out forwards;
-            opacity: 0;
-        }
+        .fp-page .nav-header { margin-bottom: 48px; }
         
-        .hero-section p {
-            font-size: 1.5rem;
-            margin-bottom: 50px;
-            color: #000;
-            animation: heroSubtitleIn 0.6s ease-out 0.35s forwards, heroSubtitleGlow 3s ease-in-out 1.2s infinite;
-            opacity: 0;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            .hero-section h1,
-            .hero-section p {
-                animation: none;
-                opacity: 1;
-            }
-        }
+        /* Hero */
+        .fp-hero { text-align: center; padding: 64px 24px 80px; }
+        .fp-hero h1 { font-size: 3rem; font-weight: 700; line-height: 1.2; margin-bottom: 24px; color: #1a1a1a; }
+        .fp-hero-subtitle { font-size: 1.2rem; color: #444; line-height: 1.7; max-width: 640px; margin: 0 auto 32px; }
+        .fp-hero-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .fp-btn-primary { padding: 16px 32px; background: linear-gradient(135deg, var(--fp-blue) 0%, #5B9BF8 100%); color: white; border-radius: 10px; font-weight: 600; font-size: 1.1rem; text-decoration: none; box-shadow: 0 4px 14px rgba(66,133,244,0.35); }
+        .fp-btn-primary:hover { background: linear-gradient(135deg, #3367d6 0%, var(--fp-blue) 100%); box-shadow: 0 6px 20px rgba(66,133,244,0.45); }
+        .fp-btn-secondary { padding: 16px 32px; background: white; color: var(--fp-blue); border: 2px solid var(--fp-yellow); border-radius: 10px; font-weight: 600; font-size: 1.1rem; text-decoration: none; }
+        .fp-btn-secondary:hover { background: linear-gradient(135deg, rgba(66,133,244,0.08) 0%, rgba(247,181,0,0.08) 100%); }
         
-        .pricing-section {
-            background: white;
-            padding: 60px 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin: 40px auto;
-            max-width: 600px;
-        }
+        /* Comparison section */
+        .fp-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 80px; }
+        .fp-compare-card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+        .fp-compare-card.traditional .fp-compare-label { color: #555; }
+        .fp-compare-card.pathwise { position: relative; overflow: hidden; }
+        .fp-compare-card.pathwise::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--fp-blue), var(--fp-yellow)); }
+        .fp-compare-card.pathwise .fp-compare-label { margin-bottom: 20px; font-weight: 700; color: #1a1a1a; }
+        .fp-compare-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #555; margin-bottom: 12px; }
+        .fp-compare-price { font-size: 2.5rem; font-weight: 700; color: #1a1a1a; margin-bottom: 24px; }
+        .fp-compare-price span { font-size: 1rem; font-weight: 500; color: #666; }
+        .fp-compare-list { list-style: none; padding: 0; margin: 0; }
+        .fp-compare-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; font-size: 1rem; color: #333; }
+        .fp-compare-list .icon-x { color: var(--fp-red); font-size: 1.2rem; }
+        .fp-compare-list .icon-check { color: var(--fp-green); font-size: 1.2rem; }
         
-        .pricing-section h2 {
-            text-align: center;
-            color: #667eea;
-            font-size: 2.5rem;
-            margin-bottom: 40px;
-        }
+        /* Everything you need - 4 cards 2x2 */
+        .fp-everything { margin-bottom: 80px; }
+        .fp-everything h2, .fp-why h2 { font-size: 2rem; font-weight: 700; margin-bottom: 40px; text-align: center; color: #1a1a1a; }
+        .fp-everything-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+        .fp-everything-card { background: white; padding: 32px; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+        .fp-everything-card:nth-child(1) .icon, .fp-everything-card:nth-child(3) .icon { border: 2px solid var(--fp-blue); color: var(--fp-blue); background: rgba(66, 133, 244, 0.1); }
+        .fp-everything-card:nth-child(2) .icon, .fp-everything-card:nth-child(4) .icon { border: 2px solid var(--fp-yellow); color: var(--fp-yellow); background: rgba(247, 181, 0, 0.1); }
+        .fp-everything-card .icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 1.25rem; }
+        .fp-everything-card h3 { font-size: 1.15rem; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
+        .fp-everything-card p { font-size: 0.95rem; color: #555; line-height: 1.5; margin: 0; }
         
-        .pricing-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            background: #f8f9fa;
-        }
+        /* Why Choose Pathwise */
+        .fp-why { margin-bottom: 80px; }
+        .fp-why h2 { margin-bottom: 16px; }
+        .fp-why-subtitle { text-align: center; font-size: 1.05rem; color: #555; margin-bottom: 40px; max-width: 560px; margin-left: auto; margin-right: auto; }
+        .fp-why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .fp-why-card { background: white; padding: 32px; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); text-align: center; }
+        .fp-why-card:nth-child(1) .icon { border: 2px solid var(--fp-blue); color: var(--fp-blue); background: rgba(66, 133, 244, 0.1); }
+        .fp-why-card:nth-child(2) .icon { border: 2px solid var(--fp-yellow); color: var(--fp-yellow); background: rgba(247, 181, 0, 0.1); }
+        .fp-why-card:nth-child(3) .icon { border: 2px solid var(--fp-blue); color: var(--fp-blue); background: rgba(66, 133, 244, 0.1); }
+        .fp-why-card .icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 1.25rem; }
+        .fp-why-card h3 { font-size: 1.1rem; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
+        .fp-why-card p { font-size: 0.9rem; color: #555; line-height: 1.5; margin: 0; }
         
-        .pricing-card .price {
-            font-size: 3.5rem;
-            font-weight: 700;
-            color: #667eea;
-            margin: 20px 0;
-        }
+        /* About Us - single card */
+        .fp-about { margin-bottom: 48px; }
         
-        .pricing-card .price-label {
-            color: #666;
-            font-size: 1.1rem;
-            margin-bottom: 30px;
-        }
+        /* Footer */
+        .fp-footer { background: #f5f5f7; padding: 28px 24px; margin: 0 -20px -20px; text-align: center; }
+        .fp-footer p { margin: 0; font-size: 0.95rem; color: #444; font-weight: 500; }
+        .fp-about-card { background: white; padding: 48px; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); text-align: center; max-width: 720px; margin: 0 auto; }
+        .fp-about-card h2 { font-size: 1.75rem; font-weight: 700; color: #1a1a1a; margin-bottom: 16px; }
+        .fp-about-card p { font-size: 1rem; color: #555; line-height: 1.7; margin: 0; }
         
-        .pricing-card .features {
-            list-style: none;
-            text-align: left;
-            margin: 30px 0;
-            padding: 0;
-        }
+        /* Scroll animations */
+        .scroll-animate { opacity: 0; transform: translateY(24px); transition: opacity 0.5s ease, transform 0.5s ease; }
+        .scroll-animate.in-view { opacity: 1; transform: translateY(0); }
         
-        .pricing-card .features li {
-            padding: 10px 0;
-            border-bottom: 1px solid #e0e0e0;
+        @media (max-width: 900px) {
+            .fp-compare { grid-template-columns: 1fr; }
+            .fp-everything-grid { grid-template-columns: 1fr; }
+            .fp-why-grid { grid-template-columns: 1fr; }
+            .nav-header { flex-wrap: wrap; }
+            .nav-links { flex-wrap: wrap; gap: 16px; }
         }
-        
-        .pricing-card .features li:last-child {
-            border-bottom: none;
+        @media (max-width: 640px) {
+            .fp-hero h1 { font-size: 2rem; }
+            .fp-hero-btns { flex-direction: column; }
         }
-        
-        .pricing-card .features li:before {
-            content: "âœ“ ";
-            color: #667eea;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        /* Scroll-triggered animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(28px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .scroll-animate {
-            opacity: 0;
-            transform: translateY(28px);
-            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-        }
-
-        .scroll-animate.in-view {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .scroll-animate.stagger-1 { transition-delay: 0.1s; }
-        .scroll-animate.stagger-2 { transition-delay: 0.2s; }
-        .scroll-animate.stagger-3 { transition-delay: 0.3s; }
-        .scroll-animate.stagger-4 { transition-delay: 0.4s; }
-
-        /* Hero-style entrance for elements inside scroll sections */
-        .scroll-animate .animate-in {
-            opacity: 0;
-            transform: translateY(24px);
-        }
-        .scroll-animate.in-view .animate-in {
-            animation: heroTitleIn 0.65s ease-out forwards;
-        }
-        .scroll-animate.in-view .animate-in.delay-1 { animation-delay: 0.12s; }
-        .scroll-animate.in-view .animate-in.delay-2 { animation-delay: 0.24s; }
-        .scroll-animate.in-view .animate-in.delay-3 { animation-delay: 0.36s; }
-        .scroll-animate.in-view .animate-in.delay-4 { animation-delay: 0.48s; }
-
-        @media (prefers-reduced-motion: reduce) {
-            .scroll-animate { opacity: 1; transform: none; transition: none; }
-            .scroll-animate.in-view { opacity: 1; transform: none; }
-            .scroll-animate .animate-in { opacity: 1; transform: none; animation: none; }
-        }
-        
     </style>
 </head>
-<body>
+<body class="fp-page">
     <div class="container">
-        <!-- Navigation Header -->
+        <!-- Navigation -->
         <nav class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
-                <a href="/payment" id="plansLink" style="display: block;">Plans</a>
-                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
-                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink" style="display: block;">Pricing</a>
                 <a href="/login.html" id="loginLink" class="auth-button">Login</a>
                 <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
             </div>
         </nav>
 
-        <!-- Hero Section -->
-        <div class="hero-section">
-            <h1>Pathwise</h1>
-            <p>Your journey to better insights starts here</p>
-        </div>
-
-        <!-- Features Section -->
-        <div class="pricing-section" style="max-width: 1000px;">
-            <h2 style="text-align: center; color: #000; font-size: 2.5rem; margin-bottom: 10px;">Why Choose Pathwise?</h2>
-            <p style="text-align: center; font-size: 1.3rem; color: #000; font-weight: 600; margin-bottom: 30px;">Simple, Unlimited, Comprehensive</p>
-            <div style="background: white; padding: 24px 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 30px;">
-                <p style="color: #000; font-size: 1.3rem; font-weight: 700; text-align: center; margin-bottom: 16px;">College Counseling made for Everyone</p>
-                <p style="color: #000; line-height: 1.8; font-size: 1.1rem; text-align: center; margin-bottom: 0;">
-                    Pathwise provides online college counseling, personalized to you. You will be guided through the process, given a plan for your future, and assisted with crafting your application.
-                </p>
+        <!-- Hero -->
+        <section class="fp-hero scroll-animate">
+            <h1>Your college journey, finally made easy.</h1>
+            <p class="fp-hero-subtitle">Personalized college counseling built entirely around you — not a one-size-fits-all checklist. Get expert guidance on your schedule, at a price that makes sense.</p>
+            <div class="fp-hero-btns">
+                <a href="/module/module-0" class="fp-btn-primary" id="startNowBtn">Start Now</a>
+                <a href="#everything" class="fp-btn-secondary">Learn More</a>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 30px;">
-                <div class="feature-card scroll-animate stagger-1" style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <h3 style="color: #000; margin-bottom: 10px; font-size: 1.3rem; text-align: center;">Personalized</h3>
-                    <p style="color: #000; line-height: 1.6; text-align: center;">Your college plan is made for you, created based on your personal information.</p>
-                </div>
-                <div class="feature-card scroll-animate stagger-2" style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <h3 style="color: #000; margin-bottom: 10px; font-size: 1.3rem; text-align: center;">Unlimited</h3>
-                    <p style="color: #000; line-height: 1.6; text-align: center;">Unlike traditional college counselors, Pathwise works on your time. Ask anything, whenever you want.</p>
-                </div>
-                <div class="feature-card scroll-animate stagger-3" style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <h3 style="color: #000; margin-bottom: 10px; font-size: 1.3rem; text-align: center;">Craft your story</h3>
-                    <p style="color: #000; line-height: 1.6; text-align: center;">Having a cohesive narrative is crucial to your college application, and we will help you make yours.</p>
-                </div>
-                <div class="feature-card scroll-animate stagger-4" style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <h3 style="color: #000; margin-bottom: 10px; font-size: 1.3rem; text-align: center;">Improve your essays</h3>
-                    <p style="color: #000; line-height: 1.6; text-align: center;">We will guide you through your writing process, helping you edit your essays.</p>
-                </div>
-            </div>
-        </div>
+        </section>
 
-        <!-- About Section -->
-        <div class="pricing-section" id="about" style="max-width: 1000px; margin-top: 40px;">
-            <h2 style="text-align: center; color: #000;">About Us</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 30px;">
-                <!-- Jiayue Liu -->
-                <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <div style="width: 150px; height: 150px; border-radius: 50%; background: #f0f0f0; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid #000;">
-                        <img src="jiayue-liu.png.png" alt="Jiayue Liu" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'font-size: 3rem; color: #667eea;\'>👤</div>';">
-                    </div>
-                    <h3 style="color: #000; margin-bottom: 10px; font-size: 1.5rem; text-align: center;">Jiayue Liu</h3>
-                    <p style="color: #000; font-size: 0.9rem; margin-bottom: 15px; font-weight: 600; text-align: center;">Cofounder</p>
-                    <p style="color: #000; line-height: 1.6; font-size: 1rem; text-align: center;">
-                        Hi, I'm Jiayue Liu, cofounder of Pathwise. I created this platform to make college counseling accessible and personalized for every student.
-                    </p>
+        <!-- Comparison -->
+        <section class="fp-compare scroll-animate">
+            <div class="fp-compare-card traditional">
+                <div class="fp-compare-label">Traditional Counselor</div>
+                <div class="fp-compare-price">$10,000+</div>
+                <ul class="fp-compare-list">
+                    <li><span class="icon-x">✕</span> Hard to access</li>
+                    <li><span class="icon-x">✕</span> Limited availability</li>
+                    <li><span class="icon-x">✕</span> Generic advice</li>
+                    <li><span class="icon-x">✕</span> Expensive packages</li>
+                </ul>
+            </div>
+            <div class="fp-compare-card pathwise">
+                <div class="fp-compare-label">Pathwise</div>
+                <div class="fp-compare-price">$50 <span>month</span></div>
+                <ul class="fp-compare-list">
+                    <li><span class="icon-check">✓</span> Always available</li>
+                    <li><span class="icon-check">✓</span> Truly personalized</li>
+                    <li><span class="icon-check">✓</span> Expert guidance</li>
+                    <li><span class="icon-check">✓</span> Cancel anytime</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Everything you need -->
+        <section class="fp-everything scroll-animate" id="everything">
+            <h2>Everything you need to get in</h2>
+            <div class="fp-everything-grid">
+                <div class="fp-everything-card">
+                    <div class="icon">💬</div>
+                    <h3>Ask Anything, Anytime</h3>
+                    <p>Chat with your AI counselor whenever you need. No scheduling, no waiting.</p>
                 </div>
-                
-                <!-- Rehaan Vasudev -->
-                <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <div style="width: 150px; height: 150px; border-radius: 50%; background: #f0f0f0; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid #000;">
-                        <img src="rehaan-vasudev.jpg" alt="Rehaan Vasudev" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'font-size: 3rem; color: #667eea;\'>👤</div>';">
-                    </div>
-                    <h3 style="color: #000; margin-bottom: 10px; font-size: 1.5rem; text-align: center;">Rehaan Vasudev</h3>
-                    <p style="color: #000; font-size: 0.9rem; margin-bottom: 15px; font-weight: 600; text-align: center;">Cofounder</p>
-                    <p style="color: #000; line-height: 1.6; font-size: 1rem; text-align: center;">
-                        I'm Rehaan Vasudev, cofounder of Pathwise. Together with Jiayue, we're building a platform that helps students navigate their college journey with personalized AI-powered guidance.
-                    </p>
+                <div class="fp-everything-card">
+                    <div class="icon">🎯</div>
+                    <h3>Your College List, Curated</h3>
+                    <p>Get a personalized list of safeties, targets, and reaches based on your profile.</p>
+                </div>
+                <div class="fp-everything-card">
+                    <div class="icon">✍️</div>
+                    <h3>Essay Help That Actually Works</h3>
+                    <p>Guidance on structure, voice, and revision for your Common App and supplements.</p>
+                </div>
+                <div class="fp-everything-card">
+                    <div class="icon">📅</div>
+                    <h3>Never Miss a Deadline</h3>
+                    <p>Track application deadlines and stay organized with your personalized dashboard.</p>
                 </div>
             </div>
-        </div>
+        </section>
 
+        <!-- Why Choose Pathwise -->
+        <section class="fp-why scroll-animate" id="why">
+            <h2>Why Choose Pathwise?</h2>
+            <p class="fp-why-subtitle">We're rethinking college counseling from the ground up — personalized, affordable, and always available.</p>
+            <div class="fp-why-grid">
+                <div class="fp-why-card">
+                    <div class="icon">★</div>
+                    <h3>Built by Experts</h3>
+                    <p>Created by college counseling professionals who understand the process inside and out.</p>
+                </div>
+                <div class="fp-why-card">
+                    <div class="icon">👥</div>
+                    <h3>Student-First Approach</h3>
+                    <p>Every feature is designed around your needs, your schedule, and your goals.</p>
+                </div>
+                <div class="fp-why-card">
+                    <div class="icon">📄</div>
+                    <h3>Affordable & Transparent</h3>
+                    <p>No hidden fees. One simple price for unlimited access to everything you need.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Us -->
+        <section class="fp-about scroll-animate" id="about">
+            <div class="fp-about-card">
+                <h2>About Us</h2>
+                <p>Pathwise was founded to make college counseling accessible to every student. We combine AI-powered guidance with expert-designed frameworks to help you navigate the application process — from building your college list to crafting your essays — at a fraction of the cost of traditional counseling.</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="fp-footer">
+            <p>Pathwise · Personalized College Counseling · Built for Every Student</p>
+        </footer>
     </div>
 
     <script>
-        // Check payment status (server-based, account-specific)
         async function hasPaymentAccess() {
-            // Check server first (account-based) - requires authentication
             try {
-                const response = await fetch('/api/payment/status', {
-                    credentials: 'include'
-                });
+                const response = await fetch('/api/payment/status', { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
-                    // Server response is authoritative
                     if (data.hasPayment === true) {
-                        // Sync to localStorage for consistency
                         localStorage.setItem('paymentCompleted', 'true');
                         return true;
-                    } else {
-                        // Clear localStorage if server says no payment
-                        localStorage.removeItem('paymentCompleted');
-                        localStorage.removeItem('paymentPlan');
-                        localStorage.removeItem('paymentDate');
-                        return false;
                     }
+                    localStorage.removeItem('paymentCompleted');
+                    localStorage.removeItem('paymentPlan');
+                    localStorage.removeItem('paymentDate');
+                    return false;
                 } else if (response.status === 401) {
-                    // Not logged in - clear localStorage and return false
                     localStorage.removeItem('paymentCompleted');
                     localStorage.removeItem('paymentPlan');
                     localStorage.removeItem('paymentDate');
                     return false;
                 }
-            } catch (error) {
-                console.error('Error checking payment status:', error);
-                // If server check fails, don't trust localStorage - return false for account-based security
-                return false;
-            }
-            
+            } catch (e) { return false; }
             return false;
         }
 
-        // Check authentication status and update navigation
+        async function hasSubmittedInitialDiagnostic() {
+            try {
+                const response = await fetch('/api/auth/check', { credentials: 'include' });
+                const data = await response.json();
+                if (data.authenticated) {
+                    const res = await fetch('/api/my-responses', { credentials: 'include' });
+                    if (!res.ok) return false;
+                    const responses = await res.json();
+                    return Array.isArray(responses) && responses.some(r => (r.moduleId || r.module || '') === 'module-0');
+                }
+                return !!sessionStorage.getItem('pathwisePendingModule0');
+            } catch (e) { return false; }
+        }
+
         async function checkAuthAndUpdateNav() {
             try {
-                const response = await fetch('/api/auth/check', {
-                    credentials: 'include'
-                });
+                const response = await fetch('/api/auth/check', { credentials: 'include' });
                 const data = await response.json();
-                
                 const loginLink = document.getElementById('loginLink');
                 const logoutButton = document.getElementById('logoutButton');
-                const counselorLink = document.getElementById('counselorLink');
-                
+                const plansLink = document.getElementById('plansLink');
+                const startNowBtn = document.getElementById('startNowBtn');
+
                 if (data.authenticated) {
-                    // User is logged in - show logout, hide login
                     if (loginLink) loginLink.style.display = 'none';
                     if (logoutButton) logoutButton.style.display = 'block';
                 } else {
-                    // User is not logged in - show login, hide logout
                     if (loginLink) loginLink.style.display = 'block';
                     if (logoutButton) logoutButton.style.display = 'none';
                 }
-                
-                // Show Counselor button and hide Plans link if payment completed
-                const plansLink = document.getElementById('plansLink');
-                const responsesLink = document.getElementById('responsesLink');
-                if (counselorLink && plansLink) {
-                    const hasAccess = await hasPaymentAccess();
-                    if (hasAccess) {
-                        counselorLink.style.display = 'block';
-                        plansLink.style.display = 'none';
-                        if (responsesLink) responsesLink.style.display = 'block';
-                    } else {
-                        counselorLink.style.display = 'none';
-                        plansLink.style.display = 'block';
-                        if (responsesLink) responsesLink.style.display = 'none';
-                    }
-                }
-            } catch (error) {
-                console.error('Auth check error:', error);
-                // On error, show login button
+
+                const hasAccess = await hasPaymentAccess();
+                if (plansLink) plansLink.style.display = (data.authenticated || !hasAccess) ? 'block' : 'none';
+
+                const hasInitialDiagnostic = await hasSubmittedInitialDiagnostic();
+                const showStart = !hasAccess && !hasInitialDiagnostic;
+                if (startNowBtn) startNowBtn.style.display = showStart ? 'inline-block' : 'none';
+            } catch (e) {
                 const loginLink = document.getElementById('loginLink');
                 const logoutButton = document.getElementById('logoutButton');
                 if (loginLink) loginLink.style.display = 'block';
@@ -342,42 +276,22 @@
             }
         }
 
-        // Handle logout
         async function handleLogout() {
             try {
-                const response = await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                // Always redirect to login, even if request fails
-                window.location.href = '/login.html';
-            } catch (error) {
-                console.error('Logout error:', error);
-                // Redirect anyway
-                window.location.href = '/login.html';
-            }
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            } catch (e) {}
+            window.location.href = '/login.html';
         }
 
-        // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             checkAuthAndUpdateNav();
-            
-            // Set up logout button click handler
             const logoutButton = document.getElementById('logoutButton');
-            if (logoutButton) {
-                logoutButton.addEventListener('click', handleLogout);
-            }
+            if (logoutButton) logoutButton.addEventListener('click', handleLogout);
 
-            // Scroll-triggered animations: add .in-view when element enters viewport
             const animatedEls = document.querySelectorAll('.scroll-animate');
             if (animatedEls.length && 'IntersectionObserver' in window) {
                 const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            entry.target.classList.add('in-view');
-                        }
-                    });
+                    entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('in-view'); });
                 }, { rootMargin: '0px 0px -40px 0px', threshold: 0 });
                 animatedEls.forEach(el => observer.observe(el));
             } else {
@@ -385,5 +299,7 @@
             }
         });
     </script>
+    <script src="/nav-modules.js"></script>
+    <script src="/chat-widget.js"></script>
 </body>
 </html>

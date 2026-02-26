@@ -3,453 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Questionnaire - Pathwise</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <title>Tools - Pathwise</title>
+    <link rel="stylesheet" href="/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
     <style>
-        .payment-required {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 600px;
-            margin: 0 auto;
+        .loading { text-align: center; padding: 48px; color: #666; font-size: 1.1rem; }
+        .modules-wrapper { max-width: 100%; margin: 0 auto; }
+        .modules-wrapper.module-initial-diagnostic { max-width: 800px; margin-left: auto; margin-right: auto; }
+        .module-hero { text-align: center; margin-bottom: 48px; padding: 0 16px; opacity: 0; animation: moduleHeroIn 0.7s ease-out forwards; }
+        .module-hero h1 { font-family: var(--font-heading); font-size: 2.5rem; color: #000; margin-bottom: 12px; }
+        .module-hero p { color: #666; font-size: 1.1rem; line-height: 1.6; }
+        @keyframes moduleHeroIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
-        .payment-required h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 2rem;
+        .module-form-card { background: white; border-radius: 16px; box-shadow: 0 2px 20px rgba(0,0,0,0.04); overflow: hidden; margin-bottom: 24px; opacity: 0; transform: translateY(16px); animation: moduleCardIn 0.5s ease-out forwards; }
+        .module-form-card:nth-child(1) { animation-delay: 0.1s; }
+        .module-form-card:nth-child(2) { animation-delay: 0.18s; }
+        .module-form-card:nth-child(3) { animation-delay: 0.26s; }
+        .module-form-card:nth-child(4) { animation-delay: 0.34s; }
+        .module-form-card:nth-child(5) { animation-delay: 0.42s; }
+        .module-form-card:nth-child(6) { animation-delay: 0.5s; }
+        @keyframes moduleCardIn {
+            to { opacity: 1; transform: translateY(0); }
         }
-
-        .payment-required p {
-            color: #666;
-            font-size: 1.1rem;
-            margin-bottom: 30px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-            font-size: 1.1rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        /* Chat Interface Styles */
-        .chat-container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
-            margin: 0 auto;
-            height: 600px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 24px;
-            background: #f5f5f5;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .message {
-            max-width: 70%;
-            padding: 12px 16px;
-            border-radius: 18px;
-            word-wrap: break-word;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .message-bot {
-            align-self: flex-start;
-            background: white;
-            color: #333;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            line-height: 1.6;
-        }
-
-        .message-bot p {
-            margin: 8px 0;
-        }
-
-        .message-bot p:first-child {
-            margin-top: 0;
-        }
-
-        .message-bot p:last-child {
-            margin-bottom: 0;
-        }
-
-        .message-bot h2, .message-bot h3 {
-            margin: 12px 0 8px 0;
-            color: #333;
-            font-size: 1.1em;
-        }
-
-        .message-bot h2 {
-            font-size: 1.2em;
-        }
-
-        .message-bot ul, .message-bot ol {
-            margin: 10px 0;
-            padding-left: 25px;
-        }
-
-        .message-bot li {
-            margin: 5px 0;
-            line-height: 1.5;
-        }
-
-        .message-bot strong {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .message-bot em {
-            font-style: italic;
-        }
-
-        .message-bot code {
-            background: #f0f0f0;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-
-        .message-bot pre {
-            background: #f5f5f5;
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-            margin: 10px 0;
-        }
-
-        .message-bot pre code {
-            background: none;
-            padding: 0;
-        }
-
-        .message-user {
-            align-self: flex-end;
-            background: #555;
-            color: white;
-            border-bottom-right-radius: 4px;
-        }
-
-        .message-typing {
-            align-self: flex-start;
-            background: white;
-            padding: 12px 16px;
-            border-radius: 18px;
-            border-bottom-left-radius: 4px;
-        }
-
-        .typing-indicator {
-            display: flex;
-            gap: 4px;
-        }
-
-        .typing-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #999;
-            animation: typing 1.4s infinite;
-        }
-
-        .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
-                opacity: 0.7;
-            }
-            30% {
-                transform: translateY(-10px);
-                opacity: 1;
-            }
-        }
-
-        .chat-input-area {
-            padding: 20px;
-            margin-top: 16px;
-            background: white;
-            border-top: 1px solid #e0e0e0;
-        }
-
-        .chat-input-wrapper {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-
-        .chat-input {
-            flex: 1;
-            padding: 16px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 24px;
-            font-size: 1rem;
-            resize: vertical;
-            min-height: 56px;
-            max-height: 200px;
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.5;
-            box-sizing: border-box;
-        }
-
-        .chat-input:focus {
-            outline: none;
-            border-color: #333;
-        }
-
-        .chat-send-btn {
-            padding: 12px 24px;
-            background: #555;
-            color: white;
-            border: none;
-            border-radius: 24px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.3s;
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-
-        .chat-send-btn:hover {
-            background: #444;
-        }
-
-        .chat-send-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .option-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .option-btn {
-            padding: 10px 16px;
-            background: #f0f0f0;
-            border: 2px solid #555;
-            border-radius: 20px;
-            color: #333;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.9rem;
-        }
-
-        .option-btn:hover {
-            background: #555;
-            color: white;
-        }
-
-        .option-btn.selected {
-            background: #555;
-            color: white;
+        .module-section { padding: 28px 36px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+        .module-section:last-of-type { border-bottom: none; }
+        .module-section-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #333; margin-bottom: 20px; }
+        .module-question-item { margin-bottom: 24px; transition: transform 0.2s ease; }
+        .module-question-item:last-child { margin-bottom: 0; }
+        .module-question-item:hover { transform: translateX(4px); }
+        .module-question-item label { display: block; font-weight: 600; font-size: 1rem; color: #333; margin-bottom: 10px; }
+        .module-question-item input[type="text"], .module-question-item input[type="email"], .module-question-item input[type="number"] { width: 100%; padding: 14px 16px; border: 1px solid rgba(0,0,0,0.12); border-radius: 10px; font-size: 1rem; transition: border-color 0.25s, box-shadow 0.25s; }
+        .module-question-item input:focus { outline: none; border-color: #4285F4; box-shadow: 0 0 0 3px rgba(66,133,244,0.12); }
+        .module-question-item textarea { width: 100%; min-height: 120px; padding: 14px 16px; border: 1px solid rgba(0,0,0,0.12); border-radius: 10px; font-size: 1rem; resize: none; font-family: inherit; transition: border-color 0.25s, box-shadow 0.25s; overflow-y: hidden; }
+        .module-question-item textarea:focus { outline: none; border-color: #4285F4; box-shadow: 0 0 0 3px rgba(66,133,244,0.12); }
+        .module-question-item .radio-group, .module-question-item .checkbox-group { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+        .module-question-item .radio-option, .module-question-item .checkbox-option { display: block; border-radius: 10px; background: #f5f5f5; border: 1px solid transparent; transition: all 0.25s ease; }
+        .module-question-item .radio-option:hover, .module-question-item .checkbox-option:hover { background: #e8e8e8; border-color: rgba(66,133,244,0.3); transform: translateY(-2px); box-shadow: 0 2px 8px rgba(66,133,244,0.06); }
+        .module-question-item .radio-option-label, .module-question-item .checkbox-option-label { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; margin: 0; font-weight: 500; width: 100%; box-sizing: border-box; }
+        .module-question-item .radio-option input:checked ~ span, .module-question-item .checkbox-option input:checked ~ span { color: #000; }
+        .module-question-item .radio-option input, .module-question-item .checkbox-option input { margin: 0; width: 18px; height: 18px; accent-color: #333; flex-shrink: 0; }
+        .module-0-upload-card { margin-bottom: 24px; }
+        .module-0-upload-desc { color: #555; font-size: 0.95rem; margin-bottom: 18px; line-height: 1.5; }
+        .module-0-dropzone { position: relative; border: 2px dashed rgba(66,133,244,0.3); border-radius: 12px; padding: 32px 24px; text-align: center; cursor: pointer; background: rgba(66,133,244,0.02); transition: border-color 0.2s, background 0.2s; margin-bottom: 16px; }
+        .module-0-dropzone:hover { border-color: rgba(66,133,244,0.5); background: rgba(66,133,244,0.04); }
+        .module-0-dropzone.module-0-dropzone-active { border-color: #4285F4; background: rgba(66,133,244,0.08); }
+        .module-0-file-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .module-0-dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+        .module-0-dropzone-icon { font-size: 2.5rem; line-height: 1; opacity: 0.85; }
+        .module-0-dropzone-text { font-size: 1rem; color: #333; }
+        .module-0-dropzone-text strong { color: #000; text-decoration: underline; }
+        .module-0-dropzone-formats { font-size: 0.85rem; color: #666; }
+        .module-0-file-chosen { font-size: 0.95rem; color: #222; margin: 10px 0 4px; padding: 10px 14px; background: #e8f4e8; border: 1px solid #b8d4b8; border-radius: 8px; }
+        .module-0-upload-status { font-weight: 500; }
+        .module-0-upload-btn { margin-top: 4px; }
+        .module-0-upload-status { margin-top: 12px; font-size: 0.9rem; min-height: 1.4em; }
+        .module-submit-wrap { padding: 36px; background: #f8f9fa; border-top: 1px solid #e0e0e0; opacity: 0; animation: moduleSubmitIn 0.5s ease-out 0.55s forwards; }
+        @keyframes moduleSubmitIn { to { opacity: 1; } }
+        .module-submit { padding: 16px 40px; font-size: 1.1rem; font-weight: 600; background: #4285F4; color: white; border: none; border-radius: 12px; cursor: pointer; transition: all 0.25s ease; }
+        .module-submit:hover { background: #3367d6; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(66,133,244,0.3); }
+        .module-submit:active { transform: translateY(0); }
+        .module-locked-msg { padding: 48px 32px; text-align: center; background: white; border-radius: 20px; box-shadow: 0 2px 24px rgba(0,0,0,0.04); }
+        .module-locked-msg p { margin-bottom: 24px; color: #666; font-size: 1.05rem; }
+        /* Counselor chat (Module 1) */
+        .counselor-embed .chat-container { background: white; border-radius: 16px; box-shadow: 0 2px 20px rgba(0,0,0,0.04); overflow: hidden; display: flex; flex-direction: column; min-height: 500px; margin-top: 24px; }
+        .counselor-embed .chat-messages { flex: 1; padding: 24px; overflow-y: auto; max-height: 450px; }
+        .counselor-embed .message { margin-bottom: 16px; padding: 12px 16px; border-radius: 12px; max-width: 85%; }
+        .counselor-embed .message-bot { background: #f0f0f0; color: #333; margin-right: auto; border-bottom-left-radius: 4px; }
+        .counselor-embed .message-user { background: #4285F4; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+        .counselor-embed .message-typing { margin-bottom: 16px; }
+        .counselor-embed .typing-indicator { display: flex; gap: 6px; padding: 12px 16px; }
+        .counselor-embed .typing-dot { width: 8px; height: 8px; background: #4285F4; border-radius: 50%; animation: typingBounce 1.4s ease-in-out infinite; }
+        .counselor-embed .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .counselor-embed .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+        .counselor-embed .chat-input-area { padding: 16px; border-top: 1px solid #e0e0e0; background: #f8f9fa; display: flex; gap: 12px; align-items: flex-end; }
+        .counselor-embed .chat-input-area textarea { flex: 1; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; font-family: inherit; resize: none; min-height: 44px; max-height: 120px; }
+        .counselor-embed .chat-input-area textarea:focus { outline: none; border-color: #4285F4; }
+        .counselor-embed .chat-send-btn { padding: 12px 24px; background: #4285F4; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .counselor-embed .chat-send-btn:hover { background: #3367d6; }
+        /* Module 2 course-style pages */
+        .course-pages-wrap { margin-top: 24px; }
+        .course-page-card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 36px 40px; max-width: 720px; margin: 0 auto; }
+        .course-page-card-fullwidth { max-width: none; width: 100%; }
+        .course-page-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+        @media (max-width: 768px) { .course-page-two-col { grid-template-columns: 1fr; } }
+        .course-page-left-column { min-width: 0; }
+        .course-page-right-column { min-width: 0; }
+        .course-right-label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-bottom: 10px; }
+        .course-right-textarea { width: 100%; min-height: 480px; padding: 16px 18px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1rem; font-family: inherit; resize: vertical; }
+        .course-right-textarea:focus { outline: none; border-color: #4285F4; box-shadow: 0 0 0 2px rgba(66,133,244,0.2); }
+        .course-progress { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-bottom: 20px; }
+        .course-page-title { font-family: var(--font-heading); font-size: 1.75rem; color: #000; margin-bottom: 24px; }
+        .course-page-content { color: #333; line-height: 1.7; margin-bottom: 28px; overflow-wrap: break-word; word-wrap: break-word; }
+        .course-page-content p { margin-bottom: 1em; }
+        .course-page-content p:last-child { margin-bottom: 0; }
+        .course-page-content ul, .course-page-content ol { margin: 0.5em 0 1em 1.25em; padding-left: 0.5em; }
+        .course-page-content li { margin-bottom: 0.35em; }
+        .course-activity { background: #f5f5f5; border-radius: 10px; padding: 20px; margin-bottom: 28px; border-left: 4px solid #4285F4; }
+        .course-activity-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #333; margin-bottom: 8px; }
+        .course-activity-prompt { font-weight: 600; color: #333; margin-bottom: 12px; }
+        .course-activity-input { width: 100%; padding: 14px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; font-family: inherit; resize: none; overflow-y: hidden; min-height: 80px; }
+        .course-activity-input:focus { outline: none; border-color: #4285F4; box-shadow: 0 0 0 2px rgba(66,133,244,0.2); }
+        .course-nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+        .course-btn { padding: 14px 28px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; border: 2px solid #e0e0e0; background: white; color: #333; }
+        .course-btn:hover:not(:disabled) { border-color: #333; color: #000; }
+        .course-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .course-btn-next { background: #555; border-color: #555; color: white; }
+        .course-btn-next:hover:not(:disabled) { background: #444; border-color: #444; color: white; }
+        /* Module 1 College Match */
+        .college-match-wrap { margin-top: 24px; }
+        .college-match-loading { text-align: center; padding: 32px; color: #555; font-size: 1.1rem; }
+        .college-match-error { padding: 16px; background: #f8d7da; color: #721c24; border-radius: 8px; margin-bottom: 24px; }
+        .college-match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .college-box { display: flex; flex-direction: column; min-height: 200px; background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+        .college-box:hover { border-color: rgba(66,133,244,0.5); box-shadow: 0 4px 12px rgba(66,133,244,0.15); }
+        .college-box-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .college-box-header { font-weight: 700; font-size: 1.1rem; color: #000; margin-bottom: 6px; }
+        .college-box-stats { font-size: 0.8rem; color: #555; margin-bottom: 8px; line-height: 1.4; }
+        .college-box-blurb { font-size: 0.9rem; color: #555; line-height: 1.4; flex: 1; min-height: 0; }
+        .college-box-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: auto; padding-top: 12px; flex-shrink: 0; }
+        .college-box-actions button { padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border: 1px solid #ccc; background: white; color: #333; }
+        .college-box-actions button:hover:not(:disabled) { border-color: #4285F4; background: rgba(66,133,244,0.06); }
+        .college-box-add { background: #4285F4 !important; border-color: #4285F4 !important; color: white !important; }
+        .college-box-add:hover:not(:disabled) { background: #3367d6 !important; border-color: #3367d6 !important; }
+        .college-box-add:disabled { opacity: 0.7; cursor: default; }
+        .college-box-remove { color: #c00; border-color: #c00 !important; }
+        .college-box-remove:hover { background: #fee !important; border-color: #a00 !important; color: #a00 !important; }
+        .college-list-section { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+        .college-list-title { font-size: 1.25rem; color: #000; margin-bottom: 16px; }
+        .college-list-items { display: flex; flex-direction: column; gap: 12px; }
+        .college-list-empty { color: #666; font-size: 0.95rem; }
+        .college-list-card { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 18px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0; }
+        .college-list-card-main { flex: 1; min-width: 0; }
+        .college-list-card-name { font-weight: 600; color: #000; }
+        .college-list-card-blurb { display: block; font-size: 0.85rem; color: #555; margin-top: 4px; }
+        .college-list-card-actions { display: flex; gap: 8px; }
+        .college-list-card-actions button { padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border: 1px solid #ccc; background: white; color: #333; }
+        .college-list-card-actions button:hover { border-color: #333; background: #f0f0f0; }
+        .college-detail-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .college-detail-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+        .college-detail-panel { position: relative; background: white; border-radius: 12px; padding: 28px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .college-detail-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border: none; background: #eee; border-radius: 50%; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #333; }
+        .college-detail-close:hover { background: #ddd; }
+        .college-detail-name { font-size: 1.35rem; color: #000; margin-bottom: 16px; padding-right: 40px; }
+        .college-detail-body { color: #333; line-height: 1.6; }
+        .college-detail-body .college-detail-meta { margin-bottom: 8px; color: #555; font-size: 0.95rem; }
+        .college-detail-body .college-detail-stats { margin-bottom: 16px; font-size: 0.9rem; color: #555; }
+        .college-detail-body .college-detail-description { margin-top: 4px; }
+        .college-detail-body .college-detail-desc { margin-bottom: 12px; }
+        .college-detail-body .college-detail-desc:last-child { margin-bottom: 0; }
+        .college-detail-loading { color: #555; }
+        /* Safeties, Targets & Reaches */
+        .college-strategy-section { margin-top: 40px; padding-top: 32px; border-top: 1px solid #e0e0e0; }
+        .college-strategy-title { font-size: 1.35rem; color: #000; margin-bottom: 8px; }
+        .college-strategy-desc { color: #555; font-size: 0.95rem; margin-bottom: 20px; }
+        .college-strategy-btn { padding: 12px 24px; background: #4285F4; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; }
+        .college-strategy-btn:hover { background: #3367d6; }
+        .college-strategy-loading { padding: 28px 24px; color: #555; text-align: center; }
+        .college-strategy-loading-text { font-size: 1.1rem; font-weight: 500; color: #333; margin-bottom: 20px; }
+        .college-strategy-loading-bar-wrap { width: 100%; max-width: 320px; height: 8px; background: #e8e8e8; border-radius: 4px; overflow: hidden; margin: 0 auto; }
+        .college-strategy-loading-bar { height: 100%; width: 35%; background: linear-gradient(90deg, #4285F4 0%, #5B9BF8 50%, #F7B500 100%); border-radius: 4px; animation: collegeStrategyBar 1.4s ease-in-out infinite; }
+        @keyframes collegeStrategyBar { 0% { transform: translateX(-100%); } 50% { transform: translateX(280%); } 100% { transform: translateX(-100%); } }
+        .college-strategy-error { padding: 12px; background: #f8d7da; color: #721c24; border-radius: 8px; margin-top: 12px; }
+        .college-strategy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 24px; }
+        @media (max-width: 900px) { .college-strategy-grid { grid-template-columns: 1fr; } }
+        .college-strategy-column { background: #f8f9fa; border-radius: 12px; padding: 20px; border: 1px solid #e0e0e0; }
+        .college-strategy-column-title { font-size: 1.1rem; font-weight: 700; color: #000; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #4285F4; }
+        .college-strategy-column-items { display: flex; flex-direction: column; gap: 12px; }
+        .college-strategy-column-items .college-box { margin: 0; }
+        @media (prefers-reduced-motion: reduce) {
+            .module-hero, .module-form-card, .module-submit-wrap { animation: none; opacity: 1; transform: none; }
+            .module-question-item:hover { transform: none; }
+            .college-strategy-loading-bar { animation: none; transform: translateX(0); width: 60%; }
         }
     </style>
 </head>
-<body>
+<body class="fp-page">
     <div class="container">
-        <!-- Navigation Header -->
-        <header class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+        <nav class="nav-header">
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
-                <a href="/payment" id="plansLink" style="display: none;">Plans</a>
-                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
-                <a href="/responses.html" id="responsesLink" class="auth-button" style="display: none;">My Responses</a>
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink">Pricing</a>
                 <a href="/login.html" id="loginLink" class="auth-button">Login</a>
                 <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
             </div>
-        </header>
+        </nav>
 
-        <!-- Payment Required Message (shown if no payment) -->
-        <div id="paymentRequired" class="payment-required" style="display: none;">
-            <h2>Payment Required</h2>
-            <p>You need to complete payment to access the questionnaire.</p>
-            <button class="btn-primary" onclick="window.location.href='/payment'" style="padding: 15px 40px; font-size: 1.1rem; margin-top: 20px;">
-                Choose a Plan
-            </button>
-        </div>
-
-        <!-- Questionnaire Container -->
+        <div id="loading" class="loading">Loading tools...</div>
         <div id="questionnaireContainer" style="display: none;">
-            <div id="loading" class="loading" style="display: block;">Loading questions...</div>
-            <div class="chat-container" style="display: none;">
-                <div id="chatMessages" class="chat-messages"></div>
-                <div id="chatInputArea" class="chat-input-area" style="display: none;">
-                    <div class="chat-input-wrapper">
-                        <textarea id="chatInput" class="chat-input" placeholder="Type your answer..." rows="1"></textarea>
-                        <button id="chatSendBtn" class="chat-send-btn">Send</button>
-                    </div>
-                </div>
+            <div class="modules-wrapper">
+                <div id="moduleFormContainer"></div>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
-    <script>
-        // Check payment status (server-based, account-specific)
-        async function hasPaymentAccess() {
-            // Check server first (account-based) - requires authentication
-            try {
-                const response = await fetch('/api/payment/status', {
-                    credentials: 'include'
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    // Server response is authoritative
-                    if (data.hasPayment === true) {
-                        // Sync to localStorage for consistency
-                        localStorage.setItem('paymentCompleted', 'true');
-                        return true;
-                    } else {
-                        // Clear localStorage if server says no payment
-                        localStorage.removeItem('paymentCompleted');
-                        localStorage.removeItem('paymentPlan');
-                        localStorage.removeItem('paymentDate');
-                        return false;
-                    }
-                } else if (response.status === 401) {
-                    // Not logged in - clear localStorage and return false
-                    localStorage.removeItem('paymentCompleted');
-                    localStorage.removeItem('paymentPlan');
-                    localStorage.removeItem('paymentDate');
-                    return false;
-                }
-            } catch (error) {
-                console.error('Error checking payment status:', error);
-                // If server check fails, don't trust localStorage - return false for account-based security
-                return false;
-            }
-            
-            return false;
-        }
-
-        // Check payment status before allowing access
-        async function checkPaymentAccess() {
-            const paymentCompleted = await hasPaymentAccess();
-            const paymentRequired = document.getElementById('paymentRequired');
-            const questionnaireContainer = document.getElementById('questionnaireContainer');
-            
-            if (!paymentCompleted) {
-                paymentRequired.style.display = 'block';
-                questionnaireContainer.style.display = 'none';
-                return false;
-            } else {
-                paymentRequired.style.display = 'none';
-                questionnaireContainer.style.display = 'block';
-                return true;
-            }
-        }
-
-        // Check authentication status and update navigation
-        async function checkAuthAndUpdateNav() {
-            try {
-                const response = await fetch('/api/auth/check', {
-                    credentials: 'include'
-                });
-                const data = await response.json();
-                
-                const loginLink = document.getElementById('loginLink');
-                const logoutButton = document.getElementById('logoutButton');
-                const counselorLink = document.getElementById('counselorLink');
-                
-                if (data.authenticated) {
-                    if (loginLink) loginLink.style.display = 'none';
-                    if (logoutButton) logoutButton.style.display = 'block';
-                } else {
-                    if (loginLink) loginLink.style.display = 'block';
-                    if (logoutButton) logoutButton.style.display = 'none';
-                }
-                
-                // Show Counselor button and hide Plans link if payment completed
-                const plansLink = document.getElementById('plansLink');
-                const responsesLink = document.getElementById('responsesLink');
-                if (counselorLink && plansLink) {
-                    const hasAccess = await hasPaymentAccess();
-                    if (hasAccess) {
-                        counselorLink.style.display = 'block';
-                        plansLink.style.display = 'none';
-                        if (responsesLink) responsesLink.style.display = 'block';
-                    } else {
-                        counselorLink.style.display = 'none';
-                        plansLink.style.display = 'block';
-                        if (responsesLink) responsesLink.style.display = 'none';
-                    }
-                }
-            } catch (error) {
-                console.error('Auth check error:', error);
-            }
-        }
-
-        // Handle logout
-        async function handleLogout() {
-            try {
-                await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                window.location.href = '/login.html';
-            } catch (error) {
-                console.error('Logout error:', error);
-                window.location.href = '/login.html';
-            }
-        }
-
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', async () => {
-            // First check payment access (this will show/hide questionnaire container)
-            await checkPaymentAccess();
-            
-            // Then update navigation based on payment status
-            await checkAuthAndUpdateNav();
-            
-            const logoutButton = document.getElementById('logoutButton');
-            if (logoutButton) {
-                logoutButton.addEventListener('click', handleLogout);
-            }
-        });
-    </script>
+    <script src="/counselor.js"></script>
+    <script src="/questionnaire-modules.js"></script>
+    <script src="/nav-modules.js"></script>
+    <script src="/chat-widget.js"></script>
 </body>
 </html>
-

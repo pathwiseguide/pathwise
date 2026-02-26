@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment Successful - Pathwise</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
         .payment-success-container {
             background: white;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
             max-width: 500px;
             margin: 60px auto;
             text-align: center;
@@ -24,10 +24,16 @@
 <body>
     <div class="container">
         <nav class="nav-header">
-            <a href="/" class="logo">Pathwise</a>
+            <a href="/" class="logo">
+                <span>Pathwise</span>
+            </a>
             <div class="nav-links">
-                <a href="/payment" class="auth-button">Plans</a>
-                <a href="/questionnaire.html" id="counselorLink" class="auth-button" style="display: none;">Counselor</a>
+                <div id="modulesDropdownWrap" class="nav-modules-dropdown" style="display: none;">
+                    <button type="button" id="modulesDropdownBtn" class="dropdown-btn">Tools ▾</button>
+                    <div id="modulesDropdownMenu" class="dropdown-menu"></div>
+                </div>
+                <a href="/dashboard" id="dashboardLink" style="display: none;">Dashboard</a>
+                <a href="/payment" id="plansLink">Pricing</a>
                 <a href="/login.html" id="loginLink" class="auth-button">Login</a>
                 <button id="logoutButton" class="auth-button" style="display: none;">Logout</button>
             </div>
@@ -39,8 +45,8 @@
             </div>
             <div id="successState" style="display: none;">
                 <h1>Payment successful</h1>
-                <p>Thank you for your purchase. You now have access to the questionnaire and Counselor.</p>
-                <a href="/questionnaire.html" class="btn-primary">Go to Questionnaire</a>
+                <p>Thank you for your purchase. You now have access to all modules.</p>
+                <a id="goToModulesLink" href="/modules?tutorial=1" class="btn-primary">Go to Modules</a>
             </div>
             <div id="errorState" style="display: none;">
                 <h1>Something went wrong</h1>
@@ -76,6 +82,11 @@
                 if (res.ok && data.success) {
                     localStorage.setItem('paymentCompleted', 'true');
                     if (data.paymentDate) localStorage.setItem('paymentDate', data.paymentDate);
+                    if (localStorage.getItem('pathwiseTutorialCompleted') !== '1') {
+                        localStorage.setItem('pathwiseTutorialPending', '1');
+                    }
+                    const pl = document.getElementById('plansLink');
+                    if (pl) pl.style.display = 'none';
                     success.style.display = 'block';
                 } else {
                     errorText.textContent = data.message || 'Could not verify payment. Please contact support if you were charged.';
@@ -88,5 +99,6 @@
             }
         })();
     </script>
+    <script src="/nav-modules.js"></script>
 </body>
 </html>

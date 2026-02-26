@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Module - Pathwise Admin</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .admin-nav { margin-bottom: 24px; }
+        .admin-nav a { margin-right: 16px; color: #4285F4; text-decoration: none; }
+        .admin-nav a:hover { text-decoration: underline; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #4285F4; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        .module-editor { border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 20px; margin-bottom: 20px; background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.03); }
+        .module-editor h3 { margin-top: 0; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 600; }
+        .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .form-group textarea { min-height: 80px; font-family: inherit; }
+        .question-ids { font-family: monospace; font-size: 0.9rem; }
+        .save-btn { padding: 12px 24px; background: #4285F4; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; }
+        .save-btn:hover { background: #5568d3; }
+        .page-editor { border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
+        .page-editor h4 { margin-top: 0; margin-bottom: 12px; color: #333; }
+        .format-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+        .format-toolbar button { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
+        .format-toolbar button:hover { background: #f0f0f0; }
+        .format-toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+        .format-toolbar label { font-size: 0.85rem; color: #666; margin-right: 4px; }
+        .add-page-btn { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; margin-bottom: 16px; }
+        .add-page-btn:hover { background: #5568d3; }
+        .remove-page-btn { padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-left: 8px; }
+        .remove-page-btn:hover { background: #c82333; }
+        .move-page-btn { padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-left: 4px; }
+        .move-page-btn:hover { background: #5a6268; }
+        .move-page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .html-hint { font-size: 0.85rem; color: #666; margin-bottom: 8px; }
+        .module-not-found { padding: 40px; text-align: center; background: #fff3cd; border: 1px solid rgba(255,193,7,0.5); border-radius: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-nav">
+            <a href="/admin.html">Edit Questions</a>
+            <a href="/admin-modules.html">Edit Modules</a>
+        </div>
+        <div class="admin-container" style="background: white; padding: 40px; border-radius: 20px; box-shadow: 0 2px 24px rgba(0,0,0,0.04); max-width: 900px; margin: 0 auto;">
+            <a href="/admin-modules.html" class="back-link">← Back to Modules</a>
+            <div id="moduleNotFound" class="module-not-found" style="display: none;">
+                <p><strong>Module not found.</strong> It may have been removed or the link is invalid.</p>
+                <p><a href="/admin-modules.html">Return to Modules</a></p>
+            </div>
+            <div id="editorWrap" style="display: none;">
+                <h1 id="moduleTitle">Edit Module</h1>
+                <div id="modulesList"></div>
+                <h2 style="margin-top: 32px; margin-bottom: 16px;">Module texts</h2>
+                <details style="margin-bottom: 20px; padding: 12px 16px; background: #f0f4ff; border: 1px solid #c5d4f7; border-radius: 8px; font-size: 0.9rem;">
+                    <summary style="cursor: pointer; font-weight: 600;">Prompt placeholders (Module 1 API prompts)</summary>
+                    <p style="margin: 8px 0 0 0;">In Module 1 safeties/targets/reaches API prompts you can use: <strong>{allAnswers}</strong>, <strong>{collegeList}</strong>. <a href="/admin.html">Edit Questions</a> has the full list.</p>
+                </details>
+                <div id="moduleTextsList"></div>
+                <button type="button" class="save-btn" id="saveBtn" style="margin-top: 20px;">Save module</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const LOCAL_IDX = 0;
+        let course = { title: 'Pathwise', modules: [] };
+        let moduleId = '';
+        let moduleIndex = -1;
+
+        function getModuleParam() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('module') || '';
+        }
+
+        function escapeAttr(s) {
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML.replace(/"/g, '&quot;');
+        }
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+
+        function wrapSelection(textarea, before, after) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selected = text.substring(start, end);
+            const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+            textarea.value = newText;
+            textarea.focus();
+            textarea.selectionEnd = start + before.length + selected.length;
+        }
+        function insertAtCursor(textarea, text) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const val = textarea.value;
+            textarea.value = val.substring(0, start) + text + val.substring(end);
+            textarea.focus();
+            textarea.setSelectionRange(start + text.length, start + text.length);
+        }
+        function applyListToSelection(textarea, tag) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selected = text.substring(start, end) || text.substring(start, start + 1);
+            const lines = selected.split(/\n/);
+            const wrapped = lines.map(line => '<li>' + line + '</li>').join('\n');
+            const before = '<' + tag + '>\n';
+            const after = '\n</' + tag + '>';
+            const newText = text.substring(0, start) + before + wrapped + after + text.substring(end);
+            textarea.value = newText;
+            textarea.focus();
+            textarea.setSelectionRange(start + before.length, start + before.length + wrapped.length);
+        }
+        function applyIndentToSelection(textarea, direction) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+            const lineEnd = text.indexOf('\n', end);
+            const lineEndActual = lineEnd === -1 ? text.length : lineEnd;
+            const selected = text.substring(lineStart, lineEndActual);
+            const indentStr = '\u00A0\u00A0\u00A0\u00A0';
+            let newBlock;
+            if (direction > 0) {
+                newBlock = selected.split('\n').map(line => indentStr + line).join('\n');
+            } else {
+                newBlock = selected.split('\n').map(line => {
+                    if (line.startsWith(indentStr)) return line.slice(indentStr.length);
+                    if (line.startsWith('    ')) return line.slice(4);
+                    return line;
+                }).join('\n');
+            }
+            const newText = text.substring(0, lineStart) + newBlock + text.substring(lineEndActual);
+            textarea.value = newText;
+            textarea.focus();
+            textarea.setSelectionRange(lineStart, lineStart + newBlock.length);
+        }
+
+        function renderModuleForm() {
+            const mod = course.modules[moduleIndex];
+            if (!mod) return;
+            document.getElementById('moduleTitle').textContent = 'Edit: ' + (mod.title || mod.id || 'Module');
+
+            const list = document.getElementById('modulesList');
+            list.innerHTML = '';
+            const div = document.createElement('div');
+            div.className = 'module-editor';
+            div.innerHTML = `
+                <h3>Settings</h3>
+                <div class="form-group">
+                    <label>ID</label>
+                    <input type="text" data-module-idx="${LOCAL_IDX}" data-field="id" value="${escapeAttr(mod.id || '')}" placeholder="module-0">
+                </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" data-module-idx="${LOCAL_IDX}" data-field="title" value="${escapeAttr(mod.title || '')}">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea data-module-idx="${LOCAL_IDX}" data-field="description" rows="2">${escapeHtml(mod.description || '')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Question IDs (comma-separated)</label>
+                    <input type="text" class="question-ids" data-module-idx="${LOCAL_IDX}" data-field="questionIds" value="${escapeAttr((mod.questionIds || []).join(', '))}" placeholder="1, 2, 3">
+                </div>
+                <div class="form-group">
+                    <label>Order</label>
+                    <input type="number" data-module-idx="${LOCAL_IDX}" data-field="order" value="${mod.order ?? moduleIndex}">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" data-module-idx="${LOCAL_IDX}" data-field="free" ${mod.free ? 'checked' : ''}> Free (Module 0 - no login required)</label>
+                </div>
+            `;
+            list.appendChild(div);
+            renderModuleTexts();
+        }
+
+        function renderModuleTexts() {
+            const list = document.getElementById('moduleTextsList');
+            const mod = course.modules[moduleIndex];
+            if (!list || !mod) return;
+            list.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.className = 'module-editor';
+            wrap.innerHTML = `<h3>Title & description</h3>`;
+            const titleGroup = document.createElement('div');
+            titleGroup.className = 'form-group';
+            titleGroup.innerHTML = `<label>Title (shown as "Module N: Title")</label><input type="text" data-module-idx="${LOCAL_IDX}" data-field="title" value="${escapeAttr(mod.title || '')}">`;
+            wrap.appendChild(titleGroup);
+            const descGroup = document.createElement('div');
+            descGroup.className = 'form-group';
+            descGroup.innerHTML = `
+                <label>Short description</label>
+                <div class="format-toolbar" data-for="desc-${LOCAL_IDX}">
+                    <button type="button" data-cmd="bold">Bold</button>
+                    <button type="button" data-cmd="italic">Italic</button>
+                    <label>Color:</label>
+                    <select data-cmd="color">
+                        <option value="">Default</option>
+                        <option value="#000">Black</option>
+                        <option value="#333">Dark gray</option>
+                        <option value="#666">Gray</option>
+                    </select>
+                    <button type="button" data-cmd="bullet">• Bullet list</button>
+                    <button type="button" data-cmd="number">1. Numbered list</button>
+                    <button type="button" data-cmd="indent">Indent</button>
+                    <button type="button" data-cmd="outdent">Outdent</button>
+                    <button type="button" data-cmd="newpara">New paragraph</button>
+                    <button type="button" data-cmd="linebreak">Line break</button>
+                </div>
+                <textarea data-module-idx="${LOCAL_IDX}" data-field="description" rows="3">${escapeHtml(mod.description || '')}</textarea>`;
+            wrap.appendChild(descGroup);
+
+            const hasPagesSection = mod.id === 'module-1' || mod.id === 'module-2' || mod.id === 'module-3' || (mod.pages && mod.pages.length > 0);
+            if (hasPagesSection) {
+                const pagesHeading = document.createElement('h4');
+                pagesHeading.style.marginTop = '20px';
+                pagesHeading.textContent = mod.id === 'module-1' ? 'Module 1 slides (intro, safeties, targets, reaches)' : 'Page content (course-style)';
+                wrap.appendChild(pagesHeading);
+                const pages = mod.pages && Array.isArray(mod.pages) ? mod.pages : [];
+                const addPageBtn = document.createElement('button');
+                addPageBtn.type = 'button';
+                addPageBtn.className = 'add-page-btn';
+                addPageBtn.textContent = '+ Add page';
+                addPageBtn.onclick = () => {
+                    if (!course.modules[moduleIndex].pages) course.modules[moduleIndex].pages = [];
+                    const newId = mod.id === 'module-1' ? 'p' + (course.modules[moduleIndex].pages.length + 1) : 'p' + (course.modules[moduleIndex].pages.length + 1);
+                    course.modules[moduleIndex].pages.push({ id: newId, title: 'New page', content: '', activity: null });
+                    renderModuleTexts();
+                };
+                wrap.appendChild(addPageBtn);
+                const isModule1 = mod.id === 'module-1';
+                const promptPageIds = ['safeties', 'targets', 'reaches'];
+                pages.forEach((page, pIdx) => {
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-editor';
+                    pageDiv.dataset.moduleIdx = String(LOCAL_IDX);
+                    pageDiv.dataset.pageIdx = String(pIdx);
+                    pageDiv.dataset.pageId = page.id || ('p' + (pIdx + 1));
+                    const hasPrompt = isModule1 && promptPageIds.includes(String(page.id));
+                    const contentSafe = (page.content || '').replace(/<\/textarea>/gi, '&lt;/textarea&gt;');
+                    const activitySafe = (page.activity != null ? page.activity : '').replace(/<\/textarea>/gi, '&lt;/textarea&gt;');
+                    const promptSafe = (page.prompt || '').replace(/<\/textarea>/gi, '&lt;/textarea&gt;');
+                    if (isModule1 && hasPrompt) {
+                        pageDiv.innerHTML = `
+                            <h4>Page ${pIdx + 1}: ${escapeHtml(page.title || page.id)}
+                                <button type="button" class="move-page-btn" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-dir="up" ${pIdx === 0 ? 'disabled' : ''}>↑ Move up</button>
+                                <button type="button" class="move-page-btn" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-dir="down" ${pIdx === pages.length - 1 ? 'disabled' : ''}>↓ Move down</button>
+                                <button type="button" class="remove-page-btn" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}">Remove page</button></h4>
+                            <div class="form-group">
+                                <label>Page title</label>
+                                <input type="text" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-field="pageTitle" value="${escapeAttr(page.title || '')}" placeholder="Page title">
+                            </div>
+                            <div class="form-group">
+                                <label>API prompt (used to generate colleges for this category)</label>
+                                <p class="html-hint">Placeholders: <strong>{allAnswers}</strong>, <strong>{collegeList}</strong>. Ask for a JSON array of objects with "name" and "blurb".</p>
+                                <textarea data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-field="pagePrompt" rows="8" placeholder="e.g. Recommend 2-4 safety colleges...">${promptSafe}</textarea>
+                            </div>
+                        `;
+                    } else {
+                        pageDiv.innerHTML = `
+                            <h4>Page ${pIdx + 1}
+                                <button type="button" class="move-page-btn" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-dir="up" ${pIdx === 0 ? 'disabled' : ''}>↑ Move up</button>
+                                <button type="button" class="move-page-btn" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-dir="down" ${pIdx === pages.length - 1 ? 'disabled' : ''}>↓ Move down</button>
+                                <button type="button" class="remove-page-btn" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}">Remove page</button></h4>
+                            <div class="form-group">
+                                <label>Page title</label>
+                                <input type="text" data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-field="pageTitle" value="${escapeAttr(page.title || '')}" placeholder="Page title">
+                            </div>
+                            <div class="form-group">
+                                <label>Content</label>
+                                <p class="html-hint">Use the toolbar for bold, italic, color, bullet list, numbered list, indent, outdent, new paragraph, and line break.</p>
+                                <div class="format-toolbar" data-for="pageContent-${LOCAL_IDX}-${pIdx}">
+                                    <button type="button" data-cmd="bold">Bold</button>
+                                    <button type="button" data-cmd="italic">Italic</button>
+                                    <label>Color:</label>
+                                    <select data-cmd="color">
+                                        <option value="">Default</option>
+                                        <option value="#000">Black</option>
+                                        <option value="#333">Dark gray</option>
+                                        <option value="#666">Gray</option>
+                                    </select>
+                                    <button type="button" data-cmd="bullet">• Bullet list</button>
+                                    <button type="button" data-cmd="number">1. Numbered list</button>
+                                    <button type="button" data-cmd="indent">Indent</button>
+                                    <button type="button" data-cmd="outdent">Outdent</button>
+                                    <button type="button" data-cmd="newpara">New paragraph</button>
+                                    <button type="button" data-cmd="linebreak">Line break</button>
+                                </div>
+                                <textarea data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-field="pageContent" rows="6" placeholder="Main text for this page">${contentSafe}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Activity prompt (optional)</label>
+                                <div class="format-toolbar" data-for="pageActivity-${LOCAL_IDX}-${pIdx}">
+                                    <button type="button" data-cmd="bold">Bold</button>
+                                    <button type="button" data-cmd="italic">Italic</button>
+                                    <select data-cmd="color">
+                                        <option value="">Default</option>
+                                        <option value="#000">Black</option>
+                                        <option value="#333">Dark gray</option>
+                                        <option value="#666">Gray</option>
+                                    </select>
+                                    <button type="button" data-cmd="newpara">New paragraph</button>
+                                    <button type="button" data-cmd="linebreak">Line break</button>
+                                </div>
+                                <textarea data-module-idx="${LOCAL_IDX}" data-page-idx="${pIdx}" data-field="pageActivity" rows="3" placeholder="e.g. What's one thing you're proud of?">${activitySafe}</textarea>
+                            </div>
+                        `;
+                    }
+                    wrap.appendChild(pageDiv);
+                });
+                wrap.querySelectorAll('.remove-page-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        if (!confirm('Are you sure you want to remove this page?')) return;
+                        const pIdx = parseInt(btn.dataset.pageIdx, 10);
+                        course.modules[moduleIndex].pages.splice(pIdx, 1);
+                        renderModuleTexts();
+                    };
+                });
+                wrap.querySelectorAll('.move-page-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        const pIdx = parseInt(btn.dataset.pageIdx, 10);
+                        const dir = btn.dataset.dir;
+                        const pages = course.modules[moduleIndex].pages;
+                        if (dir === 'up' && pIdx > 0) {
+                            [pages[pIdx - 1], pages[pIdx]] = [pages[pIdx], pages[pIdx - 1]];
+                            renderModuleTexts();
+                        } else if (dir === 'down' && pIdx < pages.length - 1) {
+                            [pages[pIdx], pages[pIdx + 1]] = [pages[pIdx + 1], pages[pIdx]];
+                            renderModuleTexts();
+                        }
+                    };
+                });
+                wrap.querySelectorAll('.format-toolbar').forEach(toolbar => {
+                    const formGroup = toolbar.closest('.form-group');
+                    const ta = formGroup ? formGroup.querySelector('textarea') : null;
+                    if (!ta) return;
+                    toolbar.querySelectorAll('[data-cmd="bold"]').forEach(b => { b.onclick = () => wrapSelection(ta, '<strong>', '</strong>'); });
+                    toolbar.querySelectorAll('[data-cmd="italic"]').forEach(b => { b.onclick = () => wrapSelection(ta, '<em>', '</em>'); });
+                    toolbar.querySelectorAll('select[data-cmd="color"]').forEach(sel => {
+                        sel.onchange = () => {
+                            const color = sel.value;
+                            if (!color) return;
+                            wrapSelection(ta, '<span style="color: ' + color + '">', '</span>');
+                            sel.value = '';
+                        };
+                    });
+                    toolbar.querySelectorAll('[data-cmd="bullet"]').forEach(b => { b.onclick = () => applyListToSelection(ta, 'ul'); });
+                    toolbar.querySelectorAll('[data-cmd="number"]').forEach(b => { b.onclick = () => applyListToSelection(ta, 'ol'); });
+                    toolbar.querySelectorAll('[data-cmd="indent"]').forEach(b => { b.onclick = () => applyIndentToSelection(ta, 1); });
+                    toolbar.querySelectorAll('[data-cmd="outdent"]').forEach(b => { b.onclick = () => applyIndentToSelection(ta, -1); });
+                    toolbar.querySelectorAll('[data-cmd="newpara"]').forEach(b => { b.onclick = () => insertAtCursor(ta, '\n\n'); });
+                    toolbar.querySelectorAll('[data-cmd="linebreak"]').forEach(b => { b.onclick = () => insertAtCursor(ta, '<br>'); });
+                });
+            }
+            list.appendChild(wrap);
+        }
+
+        function collectSingleModule() {
+            const modData = { ...course.modules[moduleIndex] };
+            document.querySelectorAll('[data-module-idx="' + LOCAL_IDX + '"]').forEach(el => {
+                const field = el.dataset.field;
+                if (!field) return;
+                if (field === 'questionIds') {
+                    modData.questionIds = (el.value || '').split(',').map(s => s.trim()).filter(Boolean);
+                } else if (field === 'free') {
+                    modData.free = !!el.checked;
+                } else if (field === 'order') {
+                    modData.order = parseInt(el.value, 10) || 0;
+                } else if (field === 'pageTitle' || field === 'pageContent' || field === 'pageActivity' || field === 'pagePrompt') {
+                    // collected in page-editor pass
+                } else {
+                    modData[field] = (el.value != null ? el.value : '').toString().trim();
+                }
+            });
+            const pagePanels = document.querySelectorAll('.page-editor');
+            const pagesByIdx = {};
+            pagePanels.forEach(panel => {
+                const pageIdx = parseInt(panel.dataset.pageIdx, 10);
+                const pageId = panel.dataset.pageId || ('p' + (pageIdx + 1));
+                const titleEl = panel.querySelector('[data-field="pageTitle"]');
+                const contentEl = panel.querySelector('[data-field="pageContent"]');
+                const activityEl = panel.querySelector('[data-field="pageActivity"]');
+                const promptEl = panel.querySelector('[data-field="pagePrompt"]');
+                if (!titleEl) return;
+                const pageObj = { id: pageId, title: titleEl.value.trim() };
+                if (contentEl) pageObj.content = contentEl.value.trim();
+                if (activityEl) pageObj.activity = activityEl.value.trim() || null;
+                if (promptEl) pageObj.prompt = promptEl.value.trim() || null;
+                pagesByIdx[pageIdx] = pageObj;
+            });
+            modData.pages = [];
+            const maxIdx = Math.max(-1, ...Object.keys(pagesByIdx).map(Number));
+            for (let i = 0; i <= maxIdx; i++) {
+                if (pagesByIdx[i]) modData.pages.push(pagesByIdx[i]);
+            }
+            return modData;
+        }
+
+        async function saveModule() {
+            let payload;
+            try {
+                const collected = collectSingleModule();
+                course.modules[moduleIndex] = collected;
+                payload = { ...course, modules: course.modules };
+            } catch (e) {
+                console.error(e);
+                alert('Error preparing data: ' + (e.message || e));
+                return;
+            }
+            try {
+                const res = await fetch('/api/course', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload)
+                });
+                if (res.status === 401) {
+                    alert('Please log in.');
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const result = await res.json().catch(() => ({}));
+                if (result.success) {
+                    alert('Module saved.');
+                    if (payload.modules[moduleIndex].id !== moduleId) {
+                        moduleId = payload.modules[moduleIndex].id || moduleId;
+                        window.history.replaceState({}, '', '/admin-module-edit.html?module=' + encodeURIComponent(moduleId));
+                    }
+                } else {
+                    alert(result.message || 'Save failed.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to save: ' + (e.message || e));
+            }
+        }
+
+        async function loadCourse() {
+            moduleId = getModuleParam();
+            if (!moduleId) {
+                document.getElementById('moduleNotFound').style.display = 'block';
+                document.getElementById('moduleNotFound').innerHTML = '<p><strong>No module specified.</strong></p><p><a href="/admin-modules.html">Return to Modules</a></p>';
+                return;
+            }
+            try {
+                const res = await fetch('/api/course', { credentials: 'include' });
+                if (res.status === 401) {
+                    alert('Please log in.');
+                    window.location.href = '/login.html';
+                    return;
+                }
+                course = await res.json();
+                if (!course.modules) course.modules = [];
+                moduleIndex = course.modules.findIndex(m => (m.id || '') === moduleId);
+                if (moduleIndex === -1) {
+                    document.getElementById('moduleNotFound').style.display = 'block';
+                    document.getElementById('editorWrap').style.display = 'none';
+                    return;
+                }
+                document.getElementById('moduleNotFound').style.display = 'none';
+                document.getElementById('editorWrap').style.display = 'block';
+                renderModuleForm();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to load course.');
+            }
+        }
+
+        document.getElementById('saveBtn').addEventListener('click', saveModule);
+        document.addEventListener('DOMContentLoaded', loadCourse);
+    </script>
+</body>
+</html>
