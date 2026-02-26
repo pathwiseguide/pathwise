@@ -1,0 +1,35 @@
+{
+  "questions": [
+    {
+      "id": "post-college-1766443741405",
+      "text": "Let's look into some colleges you might like.",
+      "type": "text",
+      "required": false,
+      "noInput": false,
+      "options": [],
+      "chatPrompt": "You are a college counselor that is giving me some college recommendations I would like. First pay note of my GPA, SAT, or ACT to note down colleges that I would get into, taking data from each college. Then find strengths and weaknesses of each colleges and match them to my major selection and things that I am interested in and the area that I like. If something isn't given, like the GPA or SAT, do not mention is and still continue to try to find colleges that I would like. Give me Colleges no matter what. Do not give anything else other than the colleges that are recommended for me. Again, if the GPA, SAT, or ACT scores aren't given, still give me college recommendations. Do not mention that I didn't give you these. Just give me college recommendations. Give me 5-10 colleges, the average SAT, ACT, and GPA of each college, and reasons why that college is a good fit for me. Do not give me colleges that are out of my range for GPA or SAT or ACT. The average GPA for the school should be no more than .5 GPA points over me on a 4.0 scale. Use the following data: {allAnswers}",
+      "specificAnswerQuestionId": "",
+      "useRAG": false,
+      "ragQuery": "",
+      "textBubbles": [
+        "Do any of these look good for you?"
+      ],
+      "condition": null
+    },
+    {
+      "id": "post-college-1766462055479",
+      "text": "Now let's at some scholarships you may like.",
+      "type": "text",
+      "required": false,
+      "noInput": false,
+      "options": [],
+      "chatPrompt": "Give me a list of scholarships that I qualify for or I might be interested in. Then provide the link to the scholarship and a small description of each one. Give me specific scholarships. Do not include any extra character \"*\" Do not include the link. Give me as many as I can. Give me at least 10. Keep the descriptions short, one to two sentences. The descriptions should include how much you can win, how competitive it is, any requirements, and any other information needed to apply. Do not add quotation marks around the names. Leave a space between each one. You do not need any information that is not included, so give it to me regardless. Here is my information: {allAnswers} {q:post-college-1766443741405}",
+      "specificAnswerQuestionId": "",
+      "useRAG": false,
+      "ragQuery": "",
+      "textBubbles": null,
+      "condition": null
+    }
+  ],
+  "finalMessage": ""
+}

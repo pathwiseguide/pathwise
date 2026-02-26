@@ -1,0 +1,233 @@
+{
+  "title": "Pathwise College Counseling",
+  "modules": [
+    {
+      "id": "module-0",
+      "title": "Initial Diagnostic",
+      "description": "Tell us about yourself. This comprehensive diagnostic helps us understand your background, academics, activities, and goals.",
+      "questionIds": [
+        "1",
+        "2",
+        "3",
+        "1765772170950",
+        "4",
+        "1765772367077",
+        "1765772344326",
+        "1765772762906",
+        "16",
+        "1765772397699",
+        "1765772638610",
+        "1765772688681",
+        "1765772450417",
+        "1765772501152",
+        "1765772542631",
+        "1765772550210",
+        "1765772412151",
+        "1765772737014",
+        "1765772440701",
+        "1765772561776",
+        "1765772590257",
+        "1765772750883",
+        "1765772211033",
+        "1765772243220",
+        "1765772607883",
+        "1765772624492",
+        "1765772701161"
+      ],
+      "order": 0,
+      "free": true
+    },
+    {
+      "id": "module-1",
+      "title": "College Match",
+      "description": "Get personalized college recommendations. Add colleges to your list and view details.",
+      "questionIds": [
+        "1765772397699",
+        "1765772638610",
+        "1765772688681",
+        "1765772450417",
+        "1765772501152",
+        "1765772542631",
+        "1765772550210"
+      ],
+      "order": 1,
+      "free": false,
+      "pages": [
+        {
+          "id": "intro",
+          "title": "Introduction",
+          "content": "Welcome to your first module! This is foundational work that will shape your entire application strategy. Let's break down everything you need to know about creating a balanced, strategic college list.",
+          "activity": null
+        },
+        {
+          "id": "p6",
+          "title": "The Framework — The Three Buckets",
+          "content": "Think of your college list as a portfolio. You want options and insurance, not just dreams.\n\n\n<strong>1.1 Safety Schools (2-3 schools)</strong>\nDefinition: Schools where your academic profile exceeds the middle 50% of admitted students, AND you would genuinely attend if it were your only option.\nKey characteristics:\n    1. Your GPA and test scores are above the 75th percentile of admitted students\n    2. Acceptance rate typically >50% (though this varies by your profile)\n    3. You can afford it (or they meet full demonstrated need)\n    4. You have a genuine interest in attending—not just a \"backup\"\nRed flag: A safety isn't a safety if you wouldn't actually go there. Don't apply anywhere \"just in case\" if you'd be miserable there.\nExamples by profile:\nHigh achiever (3.9 GPA, 1500 SAT): State flagship honors college, strong regional universities\nSolid student (3.4 GPA, 1200 SAT): Local state universities, less selective liberal arts colleges\n\n<strong>1.2 Target Schools (4-6 schools)</strong>\nDefinition: Schools where your academic profile falls within the middle 50% of admitted students. You have a realistic shot—neither guaranteed nor unlikely.\nKey characteristics:\n    1. Your stats land between the 25th and 75th percentile\n    2. Acceptance rate typically 20-50%\n    3. These should be schools you really want to attend\n    4. This is where you'll likely spend the most research time\nThe \"sweet spot\": Targets are often where students find the best fit because they're competitive enough to be challenging but not so selective that admission feels random.\n\n<strong>1.3 Reach Schools (2-4 schools)</strong>\nDefinition: Schools where your academic profile falls below the middle 50% OR schools with <20% acceptance rates regardless of your stats.",
+          "activity": null
+        },
+        {
+          "id": "p7",
+          "title": "The \"Holistic Review\" Reality Check",
+          "content": "Schools say they practice \"holistic review,\" and most do, but academic thresholds exist.\n\nThe academic index: Many competitive schools use a formula combining GPA, test scores, and course rigor to filter applications before holistic review. If you don't clear the bar, your essays won't be read.\n\nWhat this means for your list:\n    1. Reach schools should be within shouting distance of the stats.\n    2. Extraordinary extracurriculars or circumstances can compensate for slightly lower numbers.\n    3. But a 1200 SAT won't get you past the first cut at MIT, no matter how compelling your story.",
+          "activity": null
+        },
+        {
+          "id": "safeties",
+          "title": "Safeties",
+          "prompt": "You are a college counselor. Using this student's profile, recommend around 10 SAFETY colleges—schools they are likely to get into based on GPA, test scores, and fit. Do NOT include any colleges from this list: {collegeList}\n\nStudent's responses:\n{allAnswers}\n\nReturn ONLY a valid JSON array of objects. Each object: \"name\" (college name), \"blurb\" (one short sentence why it's a safety for this student). No markdown, no extra text."
+        },
+        {
+          "id": "targets",
+          "title": "Targets",
+          "prompt": "You are a college counselor. Using this student's profile, recommend around 10 TARGET colleges—schools that are a good match for fit and selectivity. Do NOT include any colleges from this list: {collegeList}\n\nStudent's responses:\n{allAnswers}\n\nReturn ONLY a valid JSON array of objects. Each object: \"name\" (college name), \"blurb\" (one short sentence why it's a good target). No markdown, no extra text."
+        },
+        {
+          "id": "reaches",
+          "title": "Reaches",
+          "prompt": "You are a college counselor. Using this student's profile, recommend around 10 REACH colleges—more selective schools that are still a good fit. Do NOT include any colleges from this list: {collegeList} \n\nStudent's responses:\n{allAnswers}\n\nReturn ONLY a valid JSON array of objects. Each object: \"name\" (college name), \"blurb\" (one short sentence why it's a reach worth considering). No markdown, no extra text."
+        },
+        {
+          "id": "search-college",
+          "title": "Add any college",
+          "content": "Search for any college by name and add it to your list. Type the college name below and click Add to list.",
+          "activity": null
+        }
+      ],
+      "pagePrompt": "You are a college counselor. Using this student's profile, recommend around 10 REACH colleges—more selective schools that are still a good fit. Do NOT include any colleges from this list: {collegeList} \n\nStudent's responses:\n{allAnswers}\n\nReturn ONLY a valid JSON array of objects. Each object: \"name\" (college name), \"blurb\" (one short sentence why it's a reach worth considering). No markdown, no extra text."
+    },
+    {
+      "id": "module-2",
+      "title": "Making a Common App account",
+      "description": "Create and set up your Common App account for college applications.",
+      "questionIds": [],
+      "order": 2,
+      "free": false,
+      "pages": [
+        {
+          "id": "intro",
+          "title": "Introduction",
+          "content": "The Common App is used by over 1,000 colleges and universities. In this module you'll create your account and get familiar with the platform.",
+          "activity": null
+        }
+      ]
+    },
+    {
+      "id": "module-3",
+      "title": "Developing your Character",
+      "description": "Your activities, interests, awards, research, and goals.",
+      "questionIds": [
+        "1765772412151",
+        "1765772737014",
+        "1765772440701",
+        "1765772561776",
+        "1765772590257",
+        "1765772750883",
+        "1765772211033",
+        "1765772243220",
+        "1765772607883",
+        "1765772624492",
+        "1765772701161"
+      ],
+      "order": 3,
+      "free": false,
+      "pages": [
+        {
+          "id": "p1",
+          "title": "Welcome",
+          "content": "Every year, thousands of students with perfect grades and test scores get rejected from top colleges. Meanwhile, others with seemingly \"weaker\" numbers get accepted. What separates them?\n\nThe answer lies in archetypes—recognizable patterns of achievement, personality, and narrative that admissions officers intuitively understand and value. This isn't about faking a persona. It's about discovering your natural archetype, developing it authentically, and presenting it clearly.\n\nThis guide will teach you the eight archetypes that consistently win in college admissions, how to identify which one fits you, and how to build your entire application around it.",
+          "activity": null
+        },
+        {
+          "id": "p2",
+          "title": "Why Character Matters",
+          "content": "Colleges look at more than grades and test scores. They want to understand who you are: what you care about, how you spend your time, and what you've learned outside the classroom.\n\nReflect on one thing you've done in the past year that you're proud of. It could be a project, a role, or a moment when you helped someone.",
+          "activity": "What's one thing you've done in the past year that you're proud of? (A few sentences.)"
+        },
+        {
+          "id": "p3",
+          "title": "Activities & Time",
+          "content": "How you use your time says a lot about your priorities. Think about your main activities—clubs, sports, jobs, family responsibilities, hobbies—and what they mean to you.\n\nYou don't need a long list. A few meaningful activities matter more than many shallow ones.",
+          "activity": "List 2–3 activities that matter most to you and why (in a sentence each)."
+        },
+        {
+          "id": "p4",
+          "title": "Interests & Goals",
+          "content": "Your interests and goals don't have to be set in stone. It's okay to be curious and still figuring things out.\n\nWrite down what you're interested in right now and what you'd like to explore in college. aaaa",
+          "activity": "What are you most interested in exploring in college? (A few sentences.)"
+        },
+        {
+          "id": "p5",
+          "title": "Wrap-Up",
+          "content": "You've reflected on your character, activities, and goals. Use these notes when you work on applications, essays, and interviews.\n\nYou can return to this module anytime to update your thoughts. Good luck!",
+          "activity": null
+        }
+      ]
+    },
+    {
+      "id": "module-4",
+      "title": "Essay Writing",
+      "description": "Craft compelling college application essays. Learn strategies and get feedback on your writing.",
+      "questionIds": [],
+      "order": 4,
+      "free": false,
+      "pages": [
+        {
+          "id": "essay-p1",
+          "title": "Understanding the Common App Essay",
+          "content": "<strong>What Is This Essay Really For?</strong>\nThe Common App personal statement is your 650-word opportunity to speak directly to admissions officers. It travels with your application to nearly every college on your list, serving as the bridge between your statistics and your humanity.\n\n<strong>Purpose:</strong> To reveal character, values, and perspective that cannot be captured in grades, test scores, or activity lists.\n\n<strong>Format:</strong> 250-650 words, submitted through the Common Application platform.\n\n<strong>Audience:</strong> Admissions officers who read thousands of essays each season. They are looking for authenticity, self-awareness, and evidence of how you think.\n\n<strong>Why It Matters So Much</strong>\nSelective colleges receive applications from more qualified candidates than they can admit. When faced with dozens of applicants who all have perfect GPAs and top test scores, the essay becomes the differentiator. It answers the question: Who is this person, really?\n\nThe essay humanizes your application. It transforms you from a collection of data points into a real individual with curiosity, resilience, humor, or wisdom.",
+          "activity": null
+        },
+        {
+          "id": "essay-p2",
+          "title": "The Seven Prompts Explained",
+          "content": "<strong>Prompt 1: Background, Identity, Interest, or Talent</strong>\n<strong>The Question:</strong> Some students have a background, identity, interest, or talent that is so meaningful they believe their application would be incomplete without it. If this sounds like you, then please share your story.\n<strong>What Works:</strong> Specific cultural traditions, unusual hobbies, family circumstances that shaped your worldview, or talents that reveal deeper character traits.\n<strong>Strategy:</strong> Focus on one specific aspect rather than trying to cover your entire identity. Show how this element influences your daily life and perspective.\n\n<strong>Prompt 2: Challenge, Setback, or Failure</strong>\n<strong>The Question:</strong> The lessons we take from obstacles we encounter can be fundamental to later success. Recount a time when you faced a challenge, setback, or failure. How did it affect you, and what did you learn from the experience?\n<strong>What Works:</strong> Genuine struggles that led to meaningful growth. The emphasis should be on the learning and resilience, not the trauma itself.\n<strong>Strategy:</strong> Spend minimal time describing the problem. Focus most of your words on your response, the process of overcoming, and how you changed as a result.\n\n<strong>Prompt 3: Questioning Beliefs or Ideas</strong>\n<strong>The Question:</strong> Reflect on a time when you questioned or challenged a belief or idea. What prompted your thinking? What was the outcome?\n<strong>What Works:</strong> Moments when you changed your mind about something important, stood up for an unpopular opinion, or navigated conflicting values.\n<strong>Strategy:</strong> This is the most challenging prompt. Avoid sounding preachy or political. Keep the focus on your personal journey of questioning, not on convincing the reader of a position.\n\n<strong>Prompt 4: Gratitude</strong>\n<strong>The Question:</strong> Reflect on something that someone has done for you that has made you happy or thankful in a surprising way. How has this gratitude affected or motivated you?\n<strong>What Works:</strong> Small, unexpected acts of kindness that changed your trajectory or perspective. The focus should ultimately be on how this gratitude transformed you.\n<strong>Strategy:</strong> Do not write a tribute to the other person. Use their action as a starting point to explore your own growth, values, or newfound motivation.\n\n<strong>Prompt 5: Personal Growth</strong>\n<strong>The Question:</strong> Discuss an accomplishment, event, or realization that sparked a period of personal growth and a new understanding of yourself or others.\n<strong>What Works:</strong> Moments of genuine transformation, not just achievements. The realization matters more than the accomplishment itself.\n<strong>Strategy:</strong> Choose an experience that fundamentally shifted how you see yourself or the world. Show the before and after with specific details.\n\n<strong>Prompt 6: Intellectual Passion</strong>\n<strong>The Question:</strong> Describe a topic, idea, or concept you find so engaging that it makes you lose all track of time. Why does it captivate you? What or who do you turn to when you want to learn more?\n<strong>The Update:</strong> This prompt now explicitly asks what or who you turn to when learning more, emphasizing collaboration and resourcefulness.\n<strong>What Works:</strong> Unexpected interests that reveal curiosity and depth. Avoid writing about your intended major—you will cover that elsewhere.\n<strong>Strategy:</strong> Show your mind in action. Describe the rabbit holes you go down, the questions that keep you up at night, and how you pursue knowledge independently.\n\n<strong>Prompt 7: Topic of Your Choice</strong>\n<strong>The Question:</strong> Share an essay on any topic of your choice. It can be one you've already written, one that responds to a different prompt, or one of your own design.\n<strong>What Works:</strong> Literally anything that reveals something essential about you. This is the most popular prompt for good reason.\n<strong>Strategy:</strong> Use this if your best idea does not fit neatly into the other categories. Ensure your chosen topic still answers the underlying question: What do I want colleges to know about me?",
+          "activity": null
+        },
+        {
+          "id": "essay-p3",
+          "title": "Choosing Your Topic",
+          "content": "<strong>The Brainstorming Process</strong>\nGive yourself two to four weeks for genuine exploration. Rushing this phase leads to generic essays.\n\n<strong>Activity One: The Uniqueness Exercise</strong>\nList ten experiences, objects, or moments that feel specific to your life. Include small things: the way you organize your bookshelf, your Saturday morning routine, a conversation that stuck with you. Look for patterns in what you value.\n\n<strong>Activity Two: The Passion Audit</strong>\nIdentify three topics you could talk about for thirty minutes without preparation. These often reveal genuine enthusiasm that translates to engaging writing.\n\n<strong>Activity Three: The Vulnerability Check</strong>\nAsk yourself what you are slightly uncomfortable sharing. Not trauma for shock value, but the authentic, imperfect truth about who you are. The best essays often come from this territory.\n\n<strong>Red Flags to Avoid</strong>\n<strong>The Resume Recitation:</strong> Do not list achievements or rehash your activities section. The essay must reveal something new.\n<strong>The Tribute Essay:</strong> Writing primarily about your grandmother, coach, or mentor. If they appear, ensure the essay remains fundamentally about your growth.\n<strong>The Trauma Dump:</strong> Sharing painful experiences without connecting them to present growth or insight. Admissions officers are not therapists.\n<strong>The Generic Epiphany:</strong> Realizations about privilege, the value of hard work, or the importance of family that could be written by anyone.\n\n<strong>Testing Your Topic</strong>\nBefore committing, verify your idea passes these tests:\n<strong>The Specificity Test:</strong> Can you describe this using concrete details, dialogue, and scenes? Or are you relying on abstract statements?\n<strong>The So What Test:</strong> What does this reveal about you that is not obvious from the rest of your application?\n<strong>The Authenticity Test:</strong> Does this topic genuinely excite you? Can you imagine enjoying writing about it?",
+          "activity": null
+        },
+        {
+          "id": "essay-p4",
+          "title": "Structuring Your Essay",
+          "content": "<strong>The Narrative Arc</strong>\nEven short personal statements benefit from story structure. Consider this framework:\n\n<strong>The Hook:</strong> Open with a specific moment, image, or question that immediately establishes voice and draws the reader in. Avoid dictionary definitions or grand philosophical statements.\n\n<strong>The Context:</strong> Provide just enough background to orient the reader. Do not front-load with exposition.\n\n<strong>The Rising Action:</strong> Build tension through specific scenes, challenges, or discoveries. Show your mind at work.\n\n<strong>The Climax:</strong> The turning point or moment of realization. This should feel earned, not sudden.\n\n<strong>The Resolution:</strong> Connect back to who you are now and who you hope to become. End with forward momentum.\n\n<strong>Alternative Structures</strong>\n<strong>The Thematic Approach:</strong> Organize around a central metaphor or motif that recurs throughout your life. One student used her shoe collection to explore identity and growth.\n\n<strong>The Braided Narrative:</strong> Weave together two timelines or ideas that illuminate each other. Past and present, or two different passions that intersect.\n\n<strong>The Circular Structure:</strong> Begin and end with the same image or idea, but show how your understanding of it has deepened.\n\n<strong>Pacing and Proportion</strong>\n<strong>The 70-30 Rule:</strong> Spend approximately 70 percent of your essay on reflection, analysis, and insight. Reserve only 30 percent for scene-setting and description.\n\n<strong>The Zoom Lens:</strong> Alternate between wide shots (context, summary) and close-ups (specific moments with sensory detail). This creates rhythm and keeps the reader engaged.",
+          "activity": null
+        },
+        {
+          "id": "essay-p5",
+          "title": "Writing with Voice and Style",
+          "content": "<strong>Finding Your Authentic Tone</strong>\nAdmissions officers can detect when you are performing. Your essay should sound like the most polished version of how you actually speak and think.\n\n<strong>Avoid the Thesaurus Trap:</strong> Do not use words you would not naturally use. \"My father would adjourn with me to Dee's Sports Bar\" sounds ridiculous. \"My dad's like, let's go to Dee's\" sounds too casual. Find the middle ground: \"My dad and I headed to Dee's Sports Bar.\"\n\n<strong>Read Aloud:</strong> If a sentence feels awkward to speak, it will feel awkward to read. Trust your ear.\n\n<strong>Embrace Imperfection:</strong> You do not need to present yourself as fully formed. Showing uncertainty, questioning, or ongoing growth often resonates more than polished certainty.\n\n<strong>Showing Versus Telling</strong>\n<strong>Weak:</strong> I am passionate about environmental conservation.\n<strong>Strong:</strong> I spent three Saturdays sorting through my neighbor's recycling, rescuing perfectly good items from the trash, and researching local composting programs until my parents agreed to let me start a bin in our backyard.\n\n<strong>The Principle:</strong> Anchor every abstract quality in concrete action, specific scene, or vivid detail.\n\n<strong>Sentence Variety and Rhythm</strong>\nMix short, punchy sentences with longer, flowing ones. This creates musicality and keeps the reader engaged.\n\n<strong>Example:</strong> \"I failed. The chemistry exam sat on my desk, a red 62 staring up at me. But that number became my starting line, not my finish.\"",
+          "activity": null
+        },
+        {
+          "id": "essay-p6",
+          "title": "The Revision Process",
+          "content": "<strong>The Timeline</strong>\n<strong>Week One:</strong> Brainstorming and topic selection. Generate multiple possibilities before committing.\n<strong>Week Two:</strong> First draft. Write without self-censorship. Get the story down.\n<strong>Week Three:</strong> Structural revision. Ensure the arc is clear, the insight is earned, and every paragraph serves a purpose.\n<strong>Week Four:</strong> Line editing. Polish sentences, verify word count, and refine voice.\n\n<strong>The Feedback Strategy</strong>\n<strong>First Reader:</strong> Someone who knows you well—a parent, close friend, or mentor. They should verify that the essay sounds like you and captures something true.\n<strong>Second Reader:</strong> Someone who does not know you well—a teacher, counselor, or peer from a different circle. They should confirm that the essay stands alone and makes sense to strangers.\n<strong>What to Ask:</strong> Do you understand what I am trying to convey? Where do you get bored? What feels most alive?\n\n<strong>Common Revision Targets</strong>\n<strong>The Slow Open:</strong> If your first paragraph does not grab attention, cut it. Start in the middle of the action.\n<strong>The Unnecessary Summary:</strong> Cut any sentence that merely explains what the reader already knows from the scene you just showed.\n<strong>The Missing Why:</strong> Every descriptive passage needs to connect to insight. Ask of each paragraph: what does this reveal about me?\n<strong>The Abrupt Ending:</strong> Ensure your conclusion resonates beyond the specific story. Connect to broader values or future direction.",
+          "activity": null
+        },
+        {
+          "id": "essay-p7",
+          "title": "Final Polish and Submission",
+          "content": "<strong>The Technical Checklist</strong>\n<strong>Word Count:</strong> Stay within 250-650 words. Most successful essays fall between 500-650 words.\n<strong>Formatting:</strong> The Common App text box removes formatting. Do not rely on italics, bold, or special fonts. Use paragraph breaks for structure.\n<strong>Proofreading:</strong> Read backwards to catch spelling errors. Read aloud to catch awkward phrasing. Have someone else proofread for errors your eyes have grown blind to.\n\n<strong>The Authenticity Final Check</strong>\nBefore submitting, ask yourself:\nDoes this essay sound like me at my best?\nWould I feel comfortable discussing this topic in a college interview?\nDoes this add something essential to my application that appears nowhere else?\n\nIf you can answer yes to all three, you are ready.",
+          "activity": null
+        },
+        {
+          "id": "essay-p8",
+          "title": "Inspiration and Examples",
+          "content": "<strong>What Strong Essays Do</strong>\n<strong>They Start Small:</strong> One student wrote about collecting pebbles from every place she visited, using this habit to explore memory, impermanence, and her relationship with her grandmother.\n\n<strong>They Surprise:</strong> Another wrote about his fascination with traffic patterns, revealing analytical thinking and unexpected curiosity.\n\n<strong>They Risk:</strong> A student wrote about failing to start a business, showing humility, resilience, and genuine self-awareness rather than manufactured triumph.\n\n<strong>Remember the Fundamentals</strong>\nThe best Common App essays are not about the most impressive experiences. They are about the most authentic insights. A story about working at a fast-food restaurant can be more compelling than a story about interning at a prestigious company if it reveals genuine growth and self-knowledge.\n\nYour life contains multitudes. Trust that the small, specific, true things matter. Find the story only you can tell, tell it with precision and heart, and let the rest follow.",
+          "activity": null
+        },
+        {
+          "id": "essay-p9",
+          "title": "Generate Your Common App Ideas",
+          "content": "This page is for generating ideas to write your Common App essay. Use the text box on the right to brainstorm topics, jot down moments that shaped you, or draft rough ideas. Your notes are saved as you type.",
+          "activity": null,
+          "fullWidth": true,
+          "rightTextArea": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "welcome": "Hi! I'm your Pathwise course assistant. I've seen your responses so far. What would you like to work on or ask about?",
+  "default": "Thanks for your question. I'm here to help as you work through the course.",
+  "systemPrompt": "You are a helpful course assistant for Pathwise. You support users as they work through the course modules. Be clear and concise. When appropriate, reference their questionnaire responses to give personalized guidance.",
+  "useChatGPT": true,
+  "chatGPTWeight": 0.7,
+  "presetWeight": 0.3,
+  "responses": [
+    {
+      "keywords": ["help", "what", "how", "can you"],
+      "response": "I'm here to provide guidance and support based on your questionnaire responses. What specific area would you like to explore?"
+    },
+    {
+      "keywords": ["stress", "anxious", "worried", "overwhelmed"],
+      "response": "I understand that you're feeling stressed. Based on your responses, I recommend taking some time for self-care. Consider deep breathing exercises, going for a walk, or talking to someone you trust. Remember, it's okay to take things one step at a time."
+    },
+    {
+      "keywords": ["goal", "future", "plan", "next steps"],
+      "response": "Great question! Based on your questionnaire responses, I suggest breaking down your goals into smaller, manageable steps. Start with one small action you can take today, and build from there. Progress, not perfection, is what matters."
+    },
+    {
+      "keywords": ["relationship", "family", "friend", "social"],
+      "response": "Relationships are important for our well-being. Consider open communication and setting healthy boundaries. Remember that it's okay to prioritize your own needs while being there for others."
+    },
+    {
+      "keywords": ["work", "career", "job", "professional"],
+      "response": "Career decisions can be challenging. Reflect on what truly matters to you - your values, interests, and long-term goals. Consider talking to a mentor or career counselor for additional guidance."
+    },
+    {
+      "keywords": ["health", "exercise", "fitness", "wellness"],
+      "response": "Taking care of your physical and mental health is essential. Start with small, sustainable changes - even 10 minutes of movement or mindfulness can make a difference. Listen to your body and be kind to yourself."
+    },
+    {
+      "keywords": ["thank", "thanks", "appreciate"],
+      "response": "You're very welcome! I'm glad I could help. Remember, I'm here whenever you need support or have questions. Take care!"
+    }
+  ]
+}
+
+
